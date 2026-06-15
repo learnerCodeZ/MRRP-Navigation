@@ -108,8 +108,8 @@ rosrun mrrep pure_pursuit.py
 
 - [x] Phase 1：环境搭建与脚本框架
 - [x] Phase 2：MR UI 开发（菜单、画线、清空）
-- [ ] Phase 3：数据对接（SEND 功能）
-- [ ] Phase 4：Pure Pursuit 闭环仿真
+- [x] Phase 3：数据对接（SEND 功能）
+- [x] Phase 4：Pure Pursuit 闭环仿真
 
 ## Play Mode 测试
 
