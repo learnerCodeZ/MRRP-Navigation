@@ -8,9 +8,10 @@ namespace MRReP.Path
     {
         [SerializeField] private PathData pathData;
         [SerializeField] private Material pathMaterial;
-        [SerializeField] private Color pathColor = new Color(0.2f, 0.6f, 1f, 0.7f);
+        [SerializeField] private Color pathColor = new Color(0.298f, 0.933f, 0.918f, 0.9f); // #4DEEEA
         [SerializeField] private float lineWidth = 0.01f;
         [SerializeField] private float sphereRadius = 0.015f;
+        [SerializeField] private float emissionIntensity = 0.3f;
 
         private LineRenderer _lineRenderer;
         private List<GameObject> _sphereMarkers = new List<GameObject>();
@@ -29,7 +30,11 @@ namespace MRReP.Path
             }
             else
             {
-                _lineRenderer.material = new Material(Shader.Find("Sprites/Default"));
+                var mat = new Material(Shader.Find("Sprites/Default"));
+                mat.color = pathColor;
+                mat.EnableKeyword("_EMISSION");
+                mat.SetColor("_EmissionColor", pathColor * emissionIntensity);
+                _lineRenderer.material = mat;
             }
             _lineRenderer.startColor = pathColor;
             _lineRenderer.endColor = pathColor;
@@ -62,10 +67,13 @@ namespace MRReP.Path
                 sphere.transform.parent = transform;
 
                 var renderer = sphere.GetComponent<Renderer>();
-                renderer.material = pathMaterial != null
+                var mat = pathMaterial != null
                     ? new Material(pathMaterial)
                     : new Material(Shader.Find("Sprites/Default"));
-                renderer.material.color = pathColor;
+                mat.color = pathColor;
+                mat.EnableKeyword("_EMISSION");
+                mat.SetColor("_EmissionColor", pathColor * emissionIntensity);
+                renderer.material = mat;
 
                 Destroy(sphere.GetComponent<Collider>());
                 _sphereMarkers.Add(sphere);
