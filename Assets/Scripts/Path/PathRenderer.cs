@@ -88,9 +88,12 @@ namespace MRReP.Path
                 }
                 else
                 {
-                    _sphereMarkers[i].SetActive(false);
+                    Destroy(_sphereMarkers[i]);
                 }
             }
+
+            if (_sphereMarkers.Count > currentCount)
+                _sphereMarkers.RemoveRange(currentCount, _sphereMarkers.Count - currentCount);
         }
 
         public void ClearRenderers()

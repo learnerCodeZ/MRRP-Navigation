@@ -22,7 +22,42 @@ public class PlayModeUIFixer : MonoBehaviour
         EnsurePanelBackgrounds();
         EnsureButtonStyles();
         EnsureButtonLabels();
+#if UNITY_EDITOR
+        SetupEditorCamera();
+#endif
     }
+
+#if UNITY_EDITOR
+    void SetupEditorCamera()
+    {
+        var cam = Camera.main;
+        if (cam != null)
+        {
+            cam.transform.position = new Vector3(0, 2.5f, -2f);
+            cam.transform.LookAt(new Vector3(0, 0.5f, 0));
+        }
+
+        GameObject ground = GameObject.Find("EditorGround");
+        if (ground == null)
+        {
+            ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            ground.name = "EditorGround";
+            ground.transform.position = new Vector3(0, 0.49f, 0);
+            ground.transform.localScale = new Vector3(2f, 1f, 2f);
+            var renderer = ground.GetComponent<Renderer>();
+            renderer.material = new Material(Shader.Find("Standard"));
+            renderer.material.color = new Color(0.2f, 0.2f, 0.3f, 0.3f);
+            renderer.material.SetFloat("_Mode", 3);
+            renderer.material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            renderer.material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            renderer.material.SetInt("_ZWrite", 0);
+            renderer.material.DisableKeyword("_ALPHATEST_ON");
+            renderer.material.EnableKeyword("_ALPHABLEND_ON");
+            renderer.material.renderQueue = 3000;
+            Destroy(ground.GetComponent<Collider>());
+        }
+    }
+#endif
 
     void EnsureEventSystem()
     {
@@ -55,6 +90,19 @@ public class PlayModeUIFixer : MonoBehaviour
 
             img.color = PanelBg;
             img.raycastTarget = false;
+
+            if (canvas.renderMode == RenderMode.WorldSpace)
+            {
+                var scaler = canvas.GetComponent<CanvasScaler>();
+                if (scaler != null)
+                    scaler.dynamicPixelsPerUnit = 20;
+
+                var rt = canvas.GetComponent<RectTransform>();
+                if (rt != null && rt.lossyScale.sqrMagnitude < 0.001f)
+                {
+                    rt.localScale = Vector3.one * 0.005f;
+                }
+            }
         }
     }
 
@@ -122,6 +170,8 @@ public class PlayModeUIFixer : MonoBehaviour
         if (!Input.GetMouseButtonDown(0)) return;
         if (cachedEventSystem == null) return;
 
+        FixNewButtons();
+
         var pointerData = new PointerEventData(cachedEventSystem)
         {
             position = Input.mousePosition
@@ -138,6 +188,36 @@ public class PlayModeUIFixer : MonoBehaviour
                 button.onClick.Invoke();
                 Debug.Log($"[PlayModeUIFixer] Clicked: {button.gameObject.name}");
                 break;
+            }
+        }
+    }
+
+    void FixNewButtons()
+    {
+        foreach (var btn in Object.FindObjectsOfType<Button>(true))
+        {
+            if (btn.GetComponent<Image>() == null)
+            {
+                var img = btn.gameObject.AddComponent<Image>();
+                img.color = ButtonNormal;
+                img.raycastTarget = true;
+                btn.targetGraphic = img;
+
+                var colors = btn.colors;
+                colors.normalColor = ButtonNormal;
+                colors.highlightedColor = ButtonHighlighted;
+                colors.pressedColor = ButtonPressed;
+                colors.selectedColor = ButtonHighlighted;
+                colors.disabledColor = new Color(0.3f, 0.3f, 0.3f, 0.5f);
+                colors.fadeDuration = 0.1f;
+                btn.colors = colors;
+
+                var tmp = btn.GetComponentInChildren<TextMeshProUGUI>();
+                if (tmp != null)
+                {
+                    tmp.color = Color.white;
+                    tmp.fontStyle = FontStyles.Bold;
+                }
             }
         }
     }

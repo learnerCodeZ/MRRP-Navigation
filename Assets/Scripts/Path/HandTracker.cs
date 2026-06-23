@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 using System.Linq;
 using Microsoft.MixedReality.Toolkit.Input;
 
@@ -9,6 +10,11 @@ namespace MRReP.Path
         [SerializeField] private PathData pathData;
         [SerializeField] private float trackingInterval = 0.05f;
         [SerializeField] private float pinchThreshold = 0.02f;
+#if UNITY_EDITOR
+        [SerializeField] private float editorDrawPlaneY = 0.5f;
+        [SerializeField] private float editorMinPointDistance = 0.05f;
+        private Vector3 _lastEditorPoint;
+#endif
 
         private bool _isTracking;
         private bool _waitingForRelease;
@@ -50,8 +56,20 @@ namespace MRReP.Path
             if (isPinching)
             {
 #if UNITY_EDITOR
+                if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+                    return;
+
                 Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-                pathData.AddPoint(ray.GetPoint(0.5f));
+                Plane drawPlane = new Plane(Vector3.up, new Vector3(0, editorDrawPlaneY, 0));
+                if (drawPlane.Raycast(ray, out float distance))
+                {
+                    Vector3 hitPoint = ray.GetPoint(distance);
+                    if (pathData.Count == 0 || Vector3.Distance(hitPoint, _lastEditorPoint) >= editorMinPointDistance)
+                    {
+                        pathData.AddPoint(hitPoint);
+                        _lastEditorPoint = hitPoint;
+                    }
+                }
 #else
                 AddHoloLensPinchPoint();
 #endif

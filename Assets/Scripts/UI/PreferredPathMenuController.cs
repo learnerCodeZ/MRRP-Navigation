@@ -2,6 +2,7 @@ using UnityEngine;
 using TMPro;
 using MRReP.Path;
 using MRReP.ROS;
+using MRReP.Robot;
 
 namespace MRReP.UI
 {
@@ -24,6 +25,7 @@ namespace MRReP.UI
         [SerializeField] private PathRenderer pathRenderer;
         [SerializeField] private PathData pathData;
         [SerializeField] private PathSender pathSender;
+        [SerializeField] private LocalPathFollower localPathFollower;
 
         [Header("Confirm Dialog")]
         [SerializeField] private ConfirmDialog confirmDialog;
@@ -57,6 +59,7 @@ namespace MRReP.UI
 
         public void OnClearClicked()
         {
+            handTracker.StopTracking();
             confirmDialog.Show("Are you sure you want to delete all?", OnClearConfirmed);
         }
 
@@ -65,6 +68,8 @@ namespace MRReP.UI
             if (!confirmed) return;
 
             handTracker.StopTracking();
+            if (localPathFollower != null)
+                localPathFollower.StopFollowing();
             pathRenderer.ClearRenderers();
             pathData.Clear();
             _currentState = MenuState.Off;
@@ -75,6 +80,7 @@ namespace MRReP.UI
         {
             if (pathData.Count == 0) return;
 
+            handTracker.StopTracking();
             confirmDialog.Show("Are you sure you want to SEND PATH to the robot?", OnSendConfirmed);
         }
 
@@ -83,7 +89,16 @@ namespace MRReP.UI
             if (!confirmed) return;
 
             handTracker.StopTracking();
-            pathSender.SendPath(pathData);
+
+            if (localPathFollower != null)
+            {
+                localPathFollower.StartFollowing();
+            }
+            else
+            {
+                pathSender.SendPath(pathData);
+            }
+
             _currentState = MenuState.Send;
             UpdateStatusText();
         }

@@ -36,9 +36,9 @@ class PurePursuitController:
         rospy.loginfo("PurePursuit: Waiting for path on /hrp_path ...")
 
     def path_callback(self, msg):
-        for pose in msg.poses:
-            self.path_points.append((pose.position.x, pose.position.y))
-        if not self.path_received and len(self.path_points) > 0:
+        new_points = [(pose.position.x, pose.position.y) for pose in msg.poses]
+        self.path_points = new_points
+        if len(self.path_points) > 0:
             self.path_received = True
             self.x = self.path_points[0][0]
             self.y = self.path_points[0][1]
@@ -50,19 +50,25 @@ class PurePursuitController:
         if not self.path_points:
             return None
 
-        min_dist = float("inf")
-        target = None
-
-        for px, py in self.path_points:
+        nearest_idx = 0
+        nearest_dist = float("inf")
+        for i, (px, py) in enumerate(self.path_points):
             dx = px - self.x
             dy = py - self.y
             dist = math.sqrt(dx * dx + dy * dy)
+            if dist < nearest_dist:
+                nearest_dist = dist
+                nearest_idx = i
 
-            if abs(dist - self.ld) < min_dist:
-                min_dist = abs(dist - self.ld)
-                target = (px, py)
+        for i in range(nearest_idx, len(self.path_points)):
+            px, py = self.path_points[i]
+            dx = px - self.x
+            dy = py - self.y
+            dist = math.sqrt(dx * dx + dy * dy)
+            if dist >= self.ld:
+                return (px, py)
 
-        return target
+        return self.path_points[-1]
 
     def compute_control(self, target):
         dx = target[0] - self.x

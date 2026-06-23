@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import rospy
-from std_msgs.msg import String
-from ros_tcp_endpoint import TcpServer
+from ros_tcp_endpoint import TcpServer, DEFAULT_TCP_SERVER_NAME
 
 
 def main():

@@ -14,17 +14,6 @@ namespace MRReP.UI
             preferredPathMenu.SetActive(false);
         }
 
-        private void Update()
-        {
-            if (Input.GetKeyDown(KeyCode.M))
-            {
-                if (mainMenuPanel.activeSelf)
-                    HideMainMenu();
-                else
-                    ShowMainMenu();
-            }
-        }
-
         public void ShowMainMenu()
         {
             mainMenuPanel.SetActive(true);
