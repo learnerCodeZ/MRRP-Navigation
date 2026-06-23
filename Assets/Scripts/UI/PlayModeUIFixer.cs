@@ -98,9 +98,13 @@ public class PlayModeUIFixer : MonoBehaviour
                     scaler.dynamicPixelsPerUnit = 20;
 
                 var rt = canvas.GetComponent<RectTransform>();
-                if (rt != null && rt.lossyScale.sqrMagnitude < 0.001f)
+                if (rt != null)
                 {
-                    rt.localScale = Vector3.one * 0.005f;
+                    float targetScale = 0.001f;
+                    if (rt.lossyScale.sqrMagnitude < 0.001f || rt.lossyScale.x > 0.01f)
+                    {
+                        rt.localScale = Vector3.one * targetScale;
+                    }
                 }
             }
         }
