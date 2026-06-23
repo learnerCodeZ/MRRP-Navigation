@@ -1,6 +1,7 @@
 using UnityEngine;
 using Unity.Robotics.ROSTCPConnector;
 using RosMessageTypes.Nav;
+using MRReP.Anchor;
 
 namespace MRReP.ROS
 {
@@ -8,7 +9,7 @@ namespace MRReP.ROS
     {
         [SerializeField] private string topicName = "/odom";
         [SerializeField] private Robot.VirtualCarController virtualCar;
-        [SerializeField] private Anchor.SpatialAnchorManager anchorManager;
+        [SerializeField] private SpatialAnchorManager anchorManager;
 
         private void Start()
         {

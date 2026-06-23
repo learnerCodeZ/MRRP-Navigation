@@ -1,4 +1,5 @@
 using UnityEngine;
+using MRReP.Anchor;
 using MRReP.Path;
 
 namespace MRReP.Robot
@@ -15,7 +16,7 @@ namespace MRReP.Robot
 
         private int _nearestIndex;
         private bool _isFollowing;
-        private Anchor.SpatialAnchorManager _anchorManager;
+        private SpatialAnchorManager _anchorManager;
 
         public bool IsFollowing => _isFollowing;
 
@@ -49,7 +50,7 @@ namespace MRReP.Robot
 
             _nearestIndex = 0;
             _isFollowing = true;
-            _anchorManager = FindObjectOfType<Anchor.SpatialAnchorManager>();
+            _anchorManager = FindObjectOfType<SpatialAnchorManager>();
 
             var carModel = GetCarModel();
             Vector3 startPos = GetWorldPoint(pathData.Points[0]);
