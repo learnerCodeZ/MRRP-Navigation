@@ -15,8 +15,10 @@ namespace MRReP.Anchor
 
         private void Start()
         {
+            if (pathData == null)
+                pathData = FindObjectOfType<Path.PathData>();
             CreateAnchor(transform.position);
-            Debug.Log($"[SpatialAnchorManager] Anchor created at {transform.position}");
+            Debug.Log($"[SpatialAnchorManager] Anchor created at {transform.position}, pathData={(pathData != null ? "OK" : "NULL")}");
         }
 
         public void CreateAnchor(Vector3 worldPosition)

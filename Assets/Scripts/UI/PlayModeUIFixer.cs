@@ -7,7 +7,6 @@ using System.Collections.Generic;
 [DefaultExecutionOrder(-100)]
 public class PlayModeUIFixer : MonoBehaviour
 {
-    // === Design Guideline Colors ===
     static readonly Color PanelBg = new Color(0.102f, 0.145f, 0.361f, 0.70f);
     static readonly Color ButtonNormal = new Color(0.173f, 0.227f, 0.541f, 0.85f);
     static readonly Color ButtonHighlighted = new Color(0.239f, 0.310f, 0.769f, 0.90f);
@@ -22,9 +21,30 @@ public class PlayModeUIFixer : MonoBehaviour
         EnsurePanelBackgrounds();
         EnsureButtonStyles();
         EnsureButtonLabels();
+        ScaleAllCanvases();
 #if UNITY_EDITOR
         SetupEditorCamera();
 #endif
+    }
+
+    void ScaleAllCanvases()
+    {
+        foreach (var canvas in FindObjectsOfType<Canvas>())
+        {
+            if (canvas.renderMode == RenderMode.WorldSpace)
+            {
+                var rt = canvas.GetComponent<RectTransform>();
+                if (rt != null)
+                {
+                    rt.localScale = Vector3.one * 0.005f;
+                    Debug.Log($"[PlayModeUIFixer] Scaled {canvas.gameObject.name} to 0.005");
+                }
+
+                var scaler = canvas.GetComponent<CanvasScaler>();
+                if (scaler != null)
+                    scaler.dynamicPixelsPerUnit = 20;
+            }
+        }
     }
 
 #if UNITY_EDITOR
@@ -67,7 +87,6 @@ public class PlayModeUIFixer : MonoBehaviour
             var go = new GameObject("PlayModeEventSystem");
             cachedEventSystem = go.AddComponent<EventSystem>();
             go.AddComponent<StandaloneInputModule>();
-            Debug.Log("[PlayModeUIFixer] Created new EventSystem + StandaloneInputModule");
         }
     }
 
@@ -87,32 +106,14 @@ public class PlayModeUIFixer : MonoBehaviour
             var img = canvas.gameObject.GetComponent<Image>();
             if (img == null)
                 img = canvas.gameObject.AddComponent<Image>();
-
             img.color = PanelBg;
             img.raycastTarget = false;
-
-            if (canvas.renderMode == RenderMode.WorldSpace)
-            {
-                var scaler = canvas.GetComponent<CanvasScaler>();
-                if (scaler != null)
-                    scaler.dynamicPixelsPerUnit = 20;
-
-                var rt = canvas.GetComponent<RectTransform>();
-                if (rt != null)
-                {
-                    float targetScale = 0.001f;
-                    if (rt.lossyScale.sqrMagnitude < 0.001f || rt.lossyScale.x > 0.01f)
-                    {
-                        rt.localScale = Vector3.one * targetScale;
-                    }
-                }
-            }
         }
     }
 
     void EnsureButtonStyles()
     {
-        foreach (var btn in Object.FindObjectsOfType<Button>())
+        foreach (var btn in Object.FindObjectsOfType<Button>(true))
         {
             var img = btn.GetComponent<Image>();
             if (img == null)
@@ -120,11 +121,9 @@ public class PlayModeUIFixer : MonoBehaviour
                 img = btn.gameObject.AddComponent<Image>();
                 btn.targetGraphic = img;
             }
-
             img.color = ButtonNormal;
             img.raycastTarget = true;
 
-            // ColorBlock for hover/press feedback
             var colors = btn.colors;
             colors.normalColor = ButtonNormal;
             colors.highlightedColor = ButtonHighlighted;
@@ -134,7 +133,6 @@ public class PlayModeUIFixer : MonoBehaviour
             colors.fadeDuration = 0.1f;
             btn.colors = colors;
 
-            // Ensure text is white
             var tmp = btn.GetComponentInChildren<TextMeshProUGUI>();
             if (tmp != null)
             {
@@ -158,7 +156,7 @@ public class PlayModeUIFixer : MonoBehaviour
             { "DialogMessage", "Do you want to\nclear the path?" },
         };
 
-        foreach (var tmp in FindObjectsOfType<TextMeshProUGUI>())
+        foreach (var tmp in FindObjectsOfType<TextMeshProUGUI>(true))
         {
             if (labels.TryGetValue(tmp.gameObject.name, out string desiredText))
             {
@@ -190,7 +188,6 @@ public class PlayModeUIFixer : MonoBehaviour
             if (button != null)
             {
                 button.onClick.Invoke();
-                Debug.Log($"[PlayModeUIFixer] Clicked: {button.gameObject.name}");
                 break;
             }
         }

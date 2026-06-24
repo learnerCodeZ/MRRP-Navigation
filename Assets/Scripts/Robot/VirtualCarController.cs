@@ -13,6 +13,17 @@ namespace MRReP.Robot
         private Quaternion _targetRotation;
         private bool _hasNewPose;
 
+        public Transform CarModel
+        {
+            get
+            {
+                if (carModel != null) return carModel;
+                var child = transform.Find("CarModel");
+                if (child != null) return child;
+                return transform;
+            }
+        }
+
         public void UpdatePose(Vector3 position, Quaternion rotation)
         {
             _targetPosition = position;
@@ -20,11 +31,16 @@ namespace MRReP.Robot
             _hasNewPose = true;
         }
 
+        public void StopExternalControl()
+        {
+            _hasNewPose = false;
+        }
+
         private void Update()
         {
             if (!_hasNewPose) return;
 
-            Transform target = carModel != null ? carModel : transform;
+            Transform target = CarModel;
 
             if (smoothMovement)
             {
