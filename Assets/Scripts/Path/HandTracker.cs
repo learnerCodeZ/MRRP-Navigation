@@ -28,40 +28,6 @@ namespace MRReP.Path
 
         public bool IsTracking => _isTracking;
 
-#if !UNITY_EDITOR
-        // 方案A：设备上自动画线 + 停笔 1.5s 自动发送。
-        // 放这里是因为 HandTracker 在激活物体上(Start/Update 会跑)；
-        // 而 PreferredPathMenuController 在非激活的 PreferredPathMenu 面板上、Start 不跑。
-        private PathSender _autoPathSender;
-        private float _autoChangeTime;
-        private int _autoLastCount = -1;
-        private bool _autoSent;
-
-        private void Start()
-        {
-            // 自动找 PathSender + 开机自动进画线（绕开设备上不可用的 UI 菜单）
-            _autoPathSender = FindObjectOfType<PathSender>();
-            StartTracking();
-        }
-
-        private void DoAutoSend()
-        {
-            int c = pathData == null ? 0 : pathData.Count;
-            if (c != _autoLastCount)
-            {
-                _autoLastCount = c;
-                _autoChangeTime = Time.time;
-                _autoSent = false;   // 重新画了就允许再次发送
-            }
-            if (_isTracking && c >= 2 && !_autoSent && (Time.time - _autoChangeTime) > 1.5f)
-            {
-                _autoSent = true;
-                StopTracking();
-                if (_autoPathSender != null) _autoPathSender.SendPath(pathData);
-            }
-        }
-#endif
-
         public void StartTracking()
         {
             _isTracking = true;
@@ -116,9 +82,6 @@ namespace MRReP.Path
 #endif
                 _lastSampleTime = Time.time;
             }
-#if !UNITY_EDITOR
-            DoAutoSend();
-#endif
         }
 
 #if !UNITY_EDITOR

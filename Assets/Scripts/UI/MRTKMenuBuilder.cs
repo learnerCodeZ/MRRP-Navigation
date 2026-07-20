@@ -57,23 +57,24 @@ namespace MRReP.UI
                 if (tmpU != null) tmpU.text = label;
             }
 
-            // 接线：PressableButton.ButtonPressed → controller 对应方法
-            var pb = go.GetComponent<PressableButton>();
-            if (pb != null)
+            // 接线：Interactable.OnClick → controller 对应方法
+            // Interactable.OnClick 在 Editor 鼠标和 HL2 AirTap 上都能响应
+            var ia = go.GetComponent<Interactable>();
+            if (ia != null)
             {
-                pb.ButtonPressed.AddListener(action);
+                ia.OnClick.AddListener(action);
             }
             else
             {
-                // 有些预制体主交互是 Interactable，兜底找它
-                var ia = go.GetComponent<Interactable>();
-                if (ia != null)
+                // 兜底找 PressableButton.ButtonPressed
+                var pb = go.GetComponent<PressableButton>();
+                if (pb != null)
                 {
-                    Debug.LogWarning($"[MRTKMenuBuilder] '{label}' 没有 PressableButton，但有 Interactable——请在 Inspector 手动接 OnClick 事件到 {action.Method.Name}。");
+                    pb.ButtonPressed.AddListener(action);
                 }
                 else
                 {
-                    Debug.LogWarning($"[MRTKMenuBuilder] '{label}' 预制体既没 PressableButton 也没 Interactable，事件没接上。");
+                    Debug.LogWarning($"[MRTKMenuBuilder] '{label}' 预制体既没 Interactable 也没 PressableButton，事件没接上。");
                 }
             }
         }

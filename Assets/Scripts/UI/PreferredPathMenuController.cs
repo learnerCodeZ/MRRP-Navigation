@@ -35,10 +35,6 @@ namespace MRReP.UI
         private void Start()
         {
             UpdateStatusText();
-#if !UNITY_EDITOR
-            // 方案A(设备测试)：开机自动进画线模式（设备上 UI 按钮不可用，靠自动画+自动发）
-            OnAddClicked();
-#endif
         }
 
         private void Update()
@@ -64,37 +60,18 @@ namespace MRReP.UI
                     UpdateStatusText();
                 }
             }
-#if !UNITY_EDITOR
-            // 方案A(设备测试)：画完停笔 1.5s 自动发 /hrp_path（绕开设备上不可用的 UI 按钮）
-            DoAutoSendDwell();
-#endif
-        }
-
-#if !UNITY_EDITOR
-        // 方案A：检测"画完停笔"——路径点数停止增长超过 dwell 秒 → 自动发送
-        private float _lastChangeTime;
-        private int _lastCount = -1;
-        private bool _autoSent;
-        private void DoAutoSendDwell()
-        {
-            int c = pathData == null ? 0 : pathData.Count;
-            if (c != _lastCount)
+            // 【仅 PlayMode 测试用】按 X 直接清空路径，跳过确认弹窗
+            if (Input.GetKeyDown(KeyCode.X))
             {
-                _lastCount = c;
-                _lastChangeTime = Time.time;
-                _autoSent = false;
-            }
-            if (_currentState == MenuState.Add && c >= 2 && !_autoSent && (Time.time - _lastChangeTime) > 1.5f)
-            {
-                _autoSent = true;
                 handTracker.StopTracking();
-                if (localPathFollower != null) localPathFollower.StartFollowing();
-                else pathSender.SendPath(pathData);
-                _currentState = MenuState.Send;
+                if (localPathFollower != null)
+                    localPathFollower.StopFollowing();
+                pathRenderer.ClearRenderers();
+                pathData.Clear();
+                _currentState = MenuState.Off;
                 UpdateStatusText();
             }
         }
-#endif
 
         public void OnAddClicked()
         {
