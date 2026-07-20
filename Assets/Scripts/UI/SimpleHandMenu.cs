@@ -135,8 +135,8 @@ namespace MRReP.UI
                 t.transform.localPosition = new Vector3(0, 0, -0.006f);
                 var tm = t.AddComponent<TextMesh>();
                 tm.text = labels[i];
-                tm.characterSize = 0.02f;
-                tm.fontSize = 48;
+                tm.characterSize = 0.05f;
+                tm.fontSize = 120;
                 tm.anchor = TextAnchor.MiddleCenter;
                 tm.alignment = TextAlignment.Center;
                 tm.color = Color.white;
