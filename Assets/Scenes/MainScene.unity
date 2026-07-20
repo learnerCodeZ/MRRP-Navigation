@@ -1089,6 +1089,7 @@ GameObject:
   - component: {fileID: 616192810}
   - component: {fileID: 616192809}
   - component: {fileID: 616192808}
+  - component: {fileID: 616192812}
   m_Layer: 0
   m_Name: HandMenu
   m_TagString: Untagged
@@ -1208,6 +1209,21 @@ Transform:
   - {fileID: 1652635648}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &616192812
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 616192807}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 78f13a971f287944a87a2a4f1f364f10, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  spacing: 0.04
+  buttonSize: {x: 0.04, y: 0.03, z: 0.01}
+  menuOffsetZ: 0.15
 --- !u!1 &690204327
 GameObject:
   m_ObjectHideFlags: 0
@@ -1823,7 +1839,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1001152079
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2635,7 +2651,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1652635646}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 192a3e27f10f20e429382239ef9e5005, type: 3}
   m_Name: 
@@ -2924,6 +2940,10 @@ PrefabInstance:
     - target: {fileID: 3505893669296370184, guid: 91f8d948f42f13a438aa47ee2e156705, type: 3}
       propertyPath: m_Name
       value: VirtualCar
+      objectReference: {fileID: 0}
+    - target: {fileID: 3505893669296370184, guid: 91f8d948f42f13a438aa47ee2e156705, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6265590572591936871, guid: 91f8d948f42f13a438aa47ee2e156705, type: 3}
       propertyPath: m_LocalPosition.x
