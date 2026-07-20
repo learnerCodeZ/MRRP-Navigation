@@ -1224,6 +1224,8 @@ MonoBehaviour:
   spacing: 0.04
   buttonSize: {x: 0.04, y: 0.03, z: 0.01}
   menuOffsetZ: 0.15
+  activationDistance: 0.05
+  controller: {fileID: 1951303357}
 --- !u!1 &690204327
 GameObject:
   m_ObjectHideFlags: 0
