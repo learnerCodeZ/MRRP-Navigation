@@ -1,8 +1,13 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
+using MRReP.ROS;
+
+#if !UNITY_EDITOR
 using System.Linq;
 using Microsoft.MixedReality.Toolkit;
 using Microsoft.MixedReality.Toolkit.Input;
+using Microsoft.MixedReality.Toolkit.Utilities;   // TrackedHandJoint, Handedness, MixedRealityPose
+#endif
 
 namespace MRReP.Path
 {
@@ -22,6 +27,40 @@ namespace MRReP.Path
         private float _lastSampleTime;
 
         public bool IsTracking => _isTracking;
+
+#if !UNITY_EDITOR
+        // 方案A：设备上自动画线 + 停笔 1.5s 自动发送。
+        // 放这里是因为 HandTracker 在激活物体上(Start/Update 会跑)；
+        // 而 PreferredPathMenuController 在非激活的 PreferredPathMenu 面板上、Start 不跑。
+        private PathSender _autoPathSender;
+        private float _autoChangeTime;
+        private int _autoLastCount = -1;
+        private bool _autoSent;
+
+        private void Start()
+        {
+            // 自动找 PathSender + 开机自动进画线（绕开设备上不可用的 UI 菜单）
+            _autoPathSender = FindObjectOfType<PathSender>();
+            StartTracking();
+        }
+
+        private void DoAutoSend()
+        {
+            int c = pathData == null ? 0 : pathData.Count;
+            if (c != _autoLastCount)
+            {
+                _autoLastCount = c;
+                _autoChangeTime = Time.time;
+                _autoSent = false;   // 重新画了就允许再次发送
+            }
+            if (_isTracking && c >= 2 && !_autoSent && (Time.time - _autoChangeTime) > 1.5f)
+            {
+                _autoSent = true;
+                StopTracking();
+                if (_autoPathSender != null) _autoPathSender.SendPath(pathData);
+            }
+        }
+#endif
 
         public void StartTracking()
         {
@@ -73,40 +112,40 @@ namespace MRReP.Path
                 }
 #else
                 AddHoloLensPinchPoint();
+                _waitingForRelease = true;   // AirTap：一次捏合放一个点，松手后才能捏下一个
 #endif
                 _lastSampleTime = Time.time;
             }
+#if !UNITY_EDITOR
+            DoAutoSend();
+#endif
         }
 
 #if !UNITY_EDITOR
         private bool CheckHoloLensPinch()
         {
-            var handJointService = CoreServices.InputSystem?.GetDataProviders<IMixedRealityHandJointService>()
-                .FirstOrDefault() as IMixedRealityHandJointService;
-            if (handJointService == null) return false;
-
-            bool hasThumb = handJointService.TryGetJoint(TrackedHandJoint.ThumbTip, out var thumbPose);
-            bool hasIndex = handJointService.TryGetJoint(TrackedHandJoint.IndexTip, out var indexPose);
-
-            if (hasThumb && hasIndex)
+            // MRTK 2.8.3 标准：HandJointUtils.TryGetJointPose(关节, 左右手, out pose)
+            foreach (var hand in new[] { Handedness.Right, Handedness.Left })
             {
-                float pinchDist = Vector3.Distance(thumbPose.Position, indexPose.Position);
-                return pinchDist < pinchThreshold;
+                if (HandJointUtils.TryGetJointPose(TrackedHandJoint.ThumbTip, hand, out var thumb) &&
+                    HandJointUtils.TryGetJointPose(TrackedHandJoint.IndexTip, hand, out var index))
+                {
+                    if (Vector3.Distance(thumb.Position, index.Position) < pinchThreshold)
+                        return true;
+                }
             }
             return false;
         }
 
         private void AddHoloLensPinchPoint()
         {
-            var handJointService = CoreServices.InputSystem?.GetDataProviders<IMixedRealityHandJointService>()
-                .FirstOrDefault() as IMixedRealityHandJointService;
-            if (handJointService == null) return;
-
-            if (handJointService.TryGetJoint(TrackedHandJoint.ThumbTip, out var thumbPose) &&
-                handJointService.TryGetJoint(TrackedHandJoint.IndexTip, out var indexPose))
+            // AirTap 模式：从头部视线（你看向哪）打到地板，路径点落在地板上。
+            // 看向地板一个位置 → AirTap（捏一下）→ 那里出现一个点；重复放点连成路径。
+            var cam = Camera.main;
+            if (cam == null) return;
+            if (Physics.Raycast(cam.transform.position, cam.transform.forward, out var hit, 10f))
             {
-                Vector3 pinchPoint = (thumbPose.Position + indexPose.Position) / 2f;
-                pathData.AddPoint(pinchPoint);
+                pathData.AddPoint(hit.point + Vector3.up * 0.05f);  // 抬高 5cm 防陷地
             }
         }
 #endif

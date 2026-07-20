@@ -1,6 +1,8 @@
 
 # 产品项目计划书：MRReP (Mixed Reality-based Hand-drawn Reference Path) 虚拟仿真版
 
+> **📌 进展说明（2026-07-17 更新）**：本项目已从"全虚拟仿真"推进到**接入真车（RoboMaster EP，ROS1）**阶段。HL2 端菜单/画线/接近段等交互已重新规范——详见 `MRReP_菜单与画线交互规范.md`（行为）与 `MRReP_UI_Design_Guidelines.md`（视觉）；下文 §3 已同步为最新的**两级菜单**结构。原仿真架构（Pure Pursuit / `/odom` 回传）作为离线调试手段保留，真车部署改用 `mrrep_bridge/hrp_follower_node` + move_base。
+
 ## 1. 项目概述 & 目标
 
 本项目旨在复刻 MRReP 系统，实现一个基于混合现实（MR）的移动机器人手画参考路径（HRP, Hand-drawn Reference Path）编辑界面。
@@ -46,23 +48,25 @@
 
 ### 3.1 掌心菜单与导航交互 (Main Menu)
 
-* **触发机制**：使用 MRTK 的 `Hand Constraint Palm Up` 组件。当用户伸出手掌、掌心朝向面部时，触发显示 `Main Menu` 悬浮板；手掌放下或翻转时隐藏。
-* **二级跳转**：`Main Menu` 包含 **Preferred Path** 按钮，点击后主菜单隐藏，进入 `Preferred Path Menu`（路径编辑核心界面）。界面上方状态栏显示当前状态，初始为 `Stage 0: OFF MODE`。
+* **触发机制**：使用 MRTK 的 `Hand Constraint Palm Up` 组件。当用户伸出手掌、**掌心朝上**时，触发显示 `Main Menu` 悬浮板（**条状**吸附手腕外侧）；手掌放下或翻转时隐藏。
+* **主菜单结构（两级·用户确认）**：`Main Menu` 为竖条状，自上而下：顶部状态栏（`Stage 0` + 当前模式）→ 按钮 **`Preferred Path`** → **中间留白**（为未来功能预留：Direct Nav / Waypoints / Relocate 等）→ 按钮 **`Settings`**（暂为占位）。
+* **二级跳转**：点击 `Preferred Path` 进入 `Preferred Path Menu`（路径编辑核心界面）。状态栏初始为 `Stage 0: OFF MODE`。
+* > 📌 视觉与交互细节见 `MRReP_UI_Design_Guidelines.md` 与 `MRReP_菜单与画线交互规范.md`（本节为摘要）。
 
 ### 3.2 路径编辑核心功能 (Preferred Path Menu)
 
-界面包含四个核心按钮：**ADD**、**SEND**、**CLEAR**、**Back**。
+界面为条状，四个核心按钮（顺序：**Back / Clear / Send / Add**），同款白胶囊（图标左+文字右），当前激活模式青色强调：
 
 ```
-+------------------------------------------+
-|                 Stage 0                  |
-|                [状态显示]                 |
-+------------------------------------------+
-|   [← Back]               [☼ CLEAR]       |
-|                                          |
-|   [🚚 SEND]               [➕ ADD]        |
-+------------------------------------------+
-
++--------------------+
+|     Stage 0        |
+|    [当前模式]       |
++--------------------+
+|  ←  Back           |
+|  ✕  Clear          |
+|  ▤  Send           |
+|  +  Add   (激活)    |
++--------------------+
 ```
 
 #### ① ADD 模式 (添加 HRP)
@@ -73,19 +77,21 @@
 * 当食指尖在空间中移动时，采用“距离阈值法”（如每移动 5cm）或固定时间间隔采样空间点，存入 `List<Vector3> currentPath`。
 * 在每个采样点位置动态生成一个虚拟蓝色球体作为视觉标记。
 * 利用 Unity 的 `LineRenderer` 组件实时将这些点连成一条平滑的蓝色半透明轨迹。
+* **接近段预览（起点不在车上）🆕**：若手绘路径**起点不在小车当前位置**，实时画一条**虚线**连接 小车 → 起点，并做直线障碍检测（沿段在 costmap/地图查占据）。该虚线在 ADD 时仅作**预览**，实际靠拢在 SEND 确认后执行（见 ③）。直达=白/青虚线，不直达=红/橙+警告。
 
 
 
 #### ② CLEAR 模式 (删除/清空)
 
-* **交互逻辑**：点击后弹出二次确认 Modal 框：*“Are you sure you want to delete all?”*。
+* **交互逻辑**：点击后弹出二次确认 Modal 框：*"Are you sure you want to clear all path points?"*。
 * **执行结果**：若选择 `Yes`，清空 `List<Vector3>`，销毁（`Destroy`）场景中所有生成的蓝色路径球，重置 `LineRenderer`，状态栏恢复 `OFF MODE`。
 
 #### ③ SEND 模式 (发送并启动)
 
-* **交互逻辑**：路径绘制完成后，点击 **SEND** 按钮，弹出二次确认框：*“Are you sure you want to SEND PATH to the robot?”*。
-* **数据转换**：确认后，脚本将 `List<Vector3>` 中的 Unity 坐标点，转换为 ROS 相对坐标系下的点（处理 $Y$ 轴与 $Z$ 轴的对调）。
-* **通信发送**：将转换后的坐标数组打包为自定义 ROS 消息（如 `geometry_msgs/Point[]`），通过 ROS-TCP-Connector 发布至指定 Topic。状态栏切换为 `SEND PATH`（或小车运行状态）。
+* **交互逻辑**：路径绘制完成后，点击 **SEND** 按钮，弹出二次确认框：*"Are you sure you want to SEND PATH to the robot?"*。
+* **接近段执行（方案 A · 已定）🆕**：确认 Yes 后，若起点不在车上且虚线直达，**小车先自动靠拢到起点**（move_base 目标=起点位姿，朝向路径第二点），到达后再沿手绘路径跟随；不直达则提示用户、不自动靠拢。**车只在用户点 Yes 后才动。**
+* **数据转换**：确认后，脚本将 `List<Vector3>` 中的 Unity 坐标点，转换为 ROS 相对坐标系下的点（处理 $Y$ 轴与 $Z$ 轴的对调，并对齐空间锚点 = map 原点）。
+* **通信发送**：将转换后的坐标打包为 **`nav_msgs/Path`（`frame_id=map`）**，通过 ROS-TCP-Connector 发布到 `/hrp_path`；机器人侧 `hrp_follower_node` 逐点喂 move_base（真车）或本地 Pure Pursuit（仿真）。状态栏切换为 `Stage 0 / SEND PATH`。
 
 ---
 

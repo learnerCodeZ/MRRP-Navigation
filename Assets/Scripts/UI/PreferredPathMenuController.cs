@@ -35,6 +35,10 @@ namespace MRReP.UI
         private void Start()
         {
             UpdateStatusText();
+#if !UNITY_EDITOR
+            // 方案A(设备测试)：开机自动进画线模式（设备上 UI 按钮不可用，靠自动画+自动发）
+            OnAddClicked();
+#endif
         }
 
         private void Update()
@@ -48,7 +52,49 @@ namespace MRReP.UI
                 OnSendClicked();
             if (Input.GetKeyDown(KeyCode.B))
                 OnBackClicked();
+            // 【仅 PlayMode 测试用】按 P 直接发 /hrp_path，跳过确认弹窗
+            // （弹窗的 Yes 按钮在 PlayMode 下点不到；HL2 上用 AirTap 点按钮，无此问题）
+            if (Input.GetKeyDown(KeyCode.P))
+            {
+                if (pathData.Count > 0)
+                {
+                    handTracker.StopTracking();
+                    pathSender.SendPath(pathData);
+                    _currentState = MenuState.Send;
+                    UpdateStatusText();
+                }
+            }
+#if !UNITY_EDITOR
+            // 方案A(设备测试)：画完停笔 1.5s 自动发 /hrp_path（绕开设备上不可用的 UI 按钮）
+            DoAutoSendDwell();
+#endif
         }
+
+#if !UNITY_EDITOR
+        // 方案A：检测"画完停笔"——路径点数停止增长超过 dwell 秒 → 自动发送
+        private float _lastChangeTime;
+        private int _lastCount = -1;
+        private bool _autoSent;
+        private void DoAutoSendDwell()
+        {
+            int c = pathData == null ? 0 : pathData.Count;
+            if (c != _lastCount)
+            {
+                _lastCount = c;
+                _lastChangeTime = Time.time;
+                _autoSent = false;
+            }
+            if (_currentState == MenuState.Add && c >= 2 && !_autoSent && (Time.time - _lastChangeTime) > 1.5f)
+            {
+                _autoSent = true;
+                handTracker.StopTracking();
+                if (localPathFollower != null) localPathFollower.StartFollowing();
+                else pathSender.SendPath(pathData);
+                _currentState = MenuState.Send;
+                UpdateStatusText();
+            }
+        }
+#endif
 
         public void OnAddClicked()
         {
