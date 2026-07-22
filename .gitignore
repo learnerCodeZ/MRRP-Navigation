@@ -29,3 +29,24 @@ ros_ws/build/
 ros_ws/devel/
 ros_ws/.catkin_workspace
 ros_ws/install/
+
+# Unity UWP build outputs
+UMPBuild*/
+
+# Claude Code local
+.claude/
+
+# Certificates
+*.pfx
+
+# Imported samples/tutorials (not source)
+Assets/Samples/
+Assets/Samples.meta
+Assets/MRTK.Tutorials.PCHolographicRemoting/
+Assets/MRTK.Tutorials.PCHolographicRemoting.meta
+
+# Auto-generated XR/MRTK settings
+Assets/XR/
+Assets/XR.meta
+Assets/MixedRealityToolkitExperienceSettingsProfile.asset
+Assets/MixedRealityToolkitExperienceSettingsProfile.asset.meta

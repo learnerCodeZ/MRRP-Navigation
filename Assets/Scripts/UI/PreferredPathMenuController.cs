@@ -82,8 +82,14 @@ namespace MRReP.UI
 
         public void OnClearClicked()
         {
+            // 直接清空（跳过确认弹窗——HL2 上 Unity UI 弹窗点不了）
             handTracker.StopTracking();
-            confirmDialog.Show("Are you sure you want to delete all?", OnClearConfirmed);
+            if (localPathFollower != null)
+                localPathFollower.StopFollowing();
+            pathRenderer.ClearRenderers();
+            pathData.Clear();
+            _currentState = MenuState.Off;
+            UpdateStatusText();
         }
 
         private void OnClearConfirmed(bool confirmed)
@@ -104,7 +110,13 @@ namespace MRReP.UI
             if (pathData.Count == 0) return;
 
             handTracker.StopTracking();
-            confirmDialog.Show("Are you sure you want to SEND PATH to the robot?", OnSendConfirmed);
+            // 直接发送（跳过确认弹窗——HL2 上 Unity UI 弹窗点不了）
+            if (localPathFollower != null)
+                localPathFollower.StartFollowing();
+            else
+                pathSender.SendPath(pathData);
+            _currentState = MenuState.Send;
+            UpdateStatusText();
         }
 
         private void OnSendConfirmed(bool confirmed)

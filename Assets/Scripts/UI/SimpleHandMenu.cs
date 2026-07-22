@@ -11,6 +11,7 @@ namespace MRReP.UI
         [SerializeField] private Vector3 buttonSize = new Vector3(0.04f, 0.03f, 0.01f);
         [SerializeField] private float menuOffsetZ = 0.15f;
         [SerializeField] private float clickDistance = 0.08f;
+        [SerializeField] private float touchDistance = 0.03f;  // 食指尖直接碰按钮的距离(3cm)
 
         [Header("功能引用")]
         [SerializeField] private PreferredPathMenuController controller;
@@ -25,14 +26,37 @@ namespace MRReP.UI
         private void Update()
         {
             if (controller == null) return;
-            bool isPinching = CheckPinch();
-            if (isPinching && !wasPinching) TrySelectButton();
-            wasPinching = isPinching;
+
+            // 直接触摸：食指尖碰到按钮就触发（不用 AirTap/捏合）
+            if (Time.time - lastActionTime > 0.3f)
+                TryTouchButton();
 
             #if UNITY_EDITOR
             if (Input.GetMouseButtonDown(0))
                 TrySelectByRay(Camera.main.ScreenPointToRay(Input.mousePosition));
             #endif
+        }
+
+        // 直接触摸检测：食指尖(IndexTip)靠近按钮(< touchDistance)就触发
+        private void TryTouchButton()
+        {
+            foreach (var hand in new[] { Handedness.Right, Handedness.Left })
+            {
+                if (HandJointUtils.TryGetJointPose(TrackedHandJoint.IndexTip, hand, out var index))
+                {
+                    for (int i = 0; i < buttons.Length; i++)
+                    {
+                        if (buttons[i] == null) continue;
+                        if (Vector3.Distance(index.Position, buttons[i].transform.position) < touchDistance)
+                        {
+                            OnButtonClicked(i);
+                            lastActionTime = Time.time;
+                            StartCoroutine(Flash(buttons[i]));
+                            return;
+                        }
+                    }
+                }
+            }
         }
 
         private bool CheckPinch()

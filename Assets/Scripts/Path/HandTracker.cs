@@ -1,13 +1,8 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 using MRReP.ROS;
-
-#if !UNITY_EDITOR
-using System.Linq;
-using Microsoft.MixedReality.Toolkit;
 using Microsoft.MixedReality.Toolkit.Input;
-using Microsoft.MixedReality.Toolkit.Utilities;   // TrackedHandJoint, Handedness, MixedRealityPose
-#endif
+using Microsoft.MixedReality.Toolkit.Utilities;
 
 namespace MRReP.Path
 {
@@ -46,10 +41,10 @@ namespace MRReP.Path
             if (!_isTracking) return;
             if (Time.time - _lastSampleTime < trackingInterval) return;
 
-#if UNITY_EDITOR
-            bool isPinching = Input.GetMouseButton(0);
-#else
+            // 手势捏合检测（Remoting + 设备都用），Editor 鼠标兜底
             bool isPinching = CheckHoloLensPinch();
+#if UNITY_EDITOR
+            if (!isPinching) isPinching = Input.GetMouseButton(0);
 #endif
 
             if (_waitingForRelease)
@@ -61,30 +56,12 @@ namespace MRReP.Path
 
             if (isPinching)
             {
-#if UNITY_EDITOR
-                if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
-                    return;
-
-                Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-                Plane drawPlane = new Plane(Vector3.up, new Vector3(0, editorDrawPlaneY, 0));
-                if (drawPlane.Raycast(ray, out float distance))
-                {
-                    Vector3 hitPoint = ray.GetPoint(distance);
-                    if (pathData.Count == 0 || Vector3.Distance(hitPoint, _lastEditorPoint) >= editorMinPointDistance)
-                    {
-                        pathData.AddPoint(hitPoint);
-                        _lastEditorPoint = hitPoint;
-                    }
-                }
-#else
                 AddHoloLensPinchPoint();
-                _waitingForRelease = true;   // AirTap：一次捏合放一个点，松手后才能捏下一个
-#endif
+                _waitingForRelease = true;   // 一次捏合放一个点，松手后才能捏下一个
                 _lastSampleTime = Time.time;
             }
         }
 
-#if !UNITY_EDITOR
         private bool CheckHoloLensPinch()
         {
             // MRTK 2.8.3 标准：HandJointUtils.TryGetJointPose(关节, 左右手, out pose)
@@ -102,15 +79,14 @@ namespace MRReP.Path
 
         private void AddHoloLensPinchPoint()
         {
-            // AirTap 模式：从头部视线（你看向哪）打到地板，路径点落在地板上。
-            // 看向地板一个位置 → AirTap（捏一下）→ 那里出现一个点；重复放点连成路径。
+            // AirTap 模式：从头部正下方打地板(Vector3.down)，路径点落在头部下方的地板上。
+            // 头移到想放点的地板位置上方 → AirTap（捏一下）→ 那里出现一个点。
             var cam = Camera.main;
             if (cam == null) return;
-            if (Physics.Raycast(cam.transform.position, cam.transform.forward, out var hit, 10f))
+            if (Physics.Raycast(cam.transform.position, Vector3.down, out var hit, 5f))
             {
                 pathData.AddPoint(hit.point + Vector3.up * 0.05f);  // 抬高 5cm 防陷地
             }
         }
-#endif
     }
 }

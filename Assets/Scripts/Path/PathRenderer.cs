@@ -10,7 +10,7 @@ namespace MRReP.Path
         [SerializeField] private Material pathMaterial;
         [SerializeField] private Color pathColor = new Color(0.298f, 0.933f, 0.918f, 1.0f); // #4DEEEA（加亮：alpha 1.0）
         [SerializeField] private float lineWidth = 0.015f;
-        [SerializeField] private float sphereRadius = 0.028f;   // 加亮+放大：1.5cm→2.8cm，HL2 上更醒目
+        [SerializeField] private float sphereRadius = 0.015f;   // 小球：1.5cm，密集
         [SerializeField] private float emissionIntensity = 2.0f; // 加亮：0.3→2.0，强发光
 
         private LineRenderer _lineRenderer;

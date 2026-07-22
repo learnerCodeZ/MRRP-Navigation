@@ -5,7 +5,7 @@ namespace MRReP.Path
 {
     public class PathData : MonoBehaviour
     {
-        [SerializeField] private float sampleDistanceThreshold = 0.05f;
+        [SerializeField] private float sampleDistanceThreshold = 0.02f;
 
         private List<Vector3> _pathPoints = new List<Vector3>();
         private Transform _anchorTransform;
