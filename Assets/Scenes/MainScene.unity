@@ -308,7 +308,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9b949d543c5d51b4eb84351cf9b05c4b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  sampleDistanceThreshold: 0.05
+  sampleDistanceThreshold: 0.02
 --- !u!1 &376606808
 GameObject:
   m_ObjectHideFlags: 0
@@ -894,7 +894,7 @@ MonoBehaviour:
   pathMaterial: {fileID: 2100000, guid: bc8a035709bb25742aced9f41b1bbcbc, type: 2}
   pathColor: {r: 0.298, g: 0.933, b: 0.918, a: 1}
   lineWidth: 0.02
-  sphereRadius: 0.03
+  sphereRadius: 0.015
   emissionIntensity: 2
 --- !u!1 &606713787
 GameObject:
@@ -1224,7 +1224,8 @@ MonoBehaviour:
   spacing: 0.04
   buttonSize: {x: 0.04, y: 0.03, z: 0.01}
   menuOffsetZ: 0.15
-  activationDistance: 0.05
+  clickDistance: 0.08
+  touchDistance: 0.03
   controller: {fileID: 1951303357}
 --- !u!1 &690204327
 GameObject:

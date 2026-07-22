@@ -57,7 +57,7 @@ namespace MRReP.Path
             if (isPinching)
             {
                 AddHoloLensPinchPoint();
-                _waitingForRelease = true;   // 一次捏合放一个点，松手后才能捏下一个
+                // 连续画线：捏住拖动持续加点（不设 _waitingForRelease）
                 _lastSampleTime = Time.time;
             }
         }
@@ -79,13 +79,18 @@ namespace MRReP.Path
 
         private void AddHoloLensPinchPoint()
         {
-            // AirTap 模式：从头部正下方打地板(Vector3.down)，路径点落在头部下方的地板上。
-            // 头移到想放点的地板位置上方 → AirTap（捏一下）→ 那里出现一个点。
-            var cam = Camera.main;
-            if (cam == null) return;
-            if (Physics.Raycast(cam.transform.position, Vector3.down, out var hit, 5f))
+            // 从手掌位置向下打地板（可靠），路径跟着手移动
+            // TODO: 激光笔模式（手掌朝向射线）需在 Editor 里 Debug 正确方向再开
+            foreach (var hand in new[] { Handedness.Right, Handedness.Left })
             {
-                pathData.AddPoint(hit.point + Vector3.up * 0.05f);  // 抬高 5cm 防陷地
+                if (HandJointUtils.TryGetJointPose(TrackedHandJoint.Palm, hand, out var palm))
+                {
+                    if (Physics.Raycast(palm.Position, Vector3.down, out var hit, 5f))
+                    {
+                        pathData.AddPoint(hit.point + Vector3.up * 0.03f);  // 抬高 3cm
+                    }
+                    return;
+                }
             }
         }
     }
