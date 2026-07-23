@@ -25,6 +25,14 @@ namespace MRReP.UI
         private TextMesh pointCountText;
         private GameObject drawBackButton;
 
+        // 确认面板（Send/Clear 的 Yes/No）
+        private GameObject confirmPanel;
+        private TextMesh confirmText;
+        private GameObject confirmYesButton;
+        private GameObject confirmNoButton;
+        private bool inConfirmMode;
+        private string pendingAction; // "Send" or "Clear"
+
         private float lastActionTime;
         private bool inDrawMode;
         private PathData pathData;
@@ -34,6 +42,7 @@ namespace MRReP.UI
             pathData = FindObjectOfType<PathData>();
             CreateMenu();
             CreateDrawPanel();
+            CreateConfirmPanel();
             ShowMenuPanel();
         }
 
@@ -61,7 +70,9 @@ namespace MRReP.UI
         {
             if (menuPanel) menuPanel.SetActive(true);
             if (drawPanel) drawPanel.SetActive(false);
+            if (confirmPanel) confirmPanel.SetActive(false);
             inDrawMode = false;
+            inConfirmMode = false;
         }
 
         private void ShowDrawPanel()
@@ -69,6 +80,33 @@ namespace MRReP.UI
             if (menuPanel) menuPanel.SetActive(false);
             if (drawPanel) drawPanel.SetActive(true);
             inDrawMode = true;
+        }
+
+        private void ShowConfirmPanel(string question, string action)
+        {
+            if (menuPanel) menuPanel.SetActive(false);
+            if (confirmPanel) confirmPanel.SetActive(true);
+            if (confirmText) confirmText.text = question;
+            inConfirmMode = true;
+            pendingAction = action;
+        }
+
+        private void ConfirmYes()
+        {
+            if (pendingAction == "Send") controller.OnSendClicked();
+            else if (pendingAction == "Clear") controller.OnClearClicked();
+            Debug.Log("[Menu] Confirmed: " + pendingAction);
+            inConfirmMode = false;
+            pendingAction = null;
+            ShowMenuPanel();
+        }
+
+        private void ConfirmNo()
+        {
+            Debug.Log("[Menu] Cancelled: " + pendingAction);
+            inConfirmMode = false;
+            pendingAction = null;
+            ShowMenuPanel();
         }
 
         #endregion
@@ -82,6 +120,28 @@ namespace MRReP.UI
             {
                 if (!HandJointUtils.TryGetJointPose(TrackedHandJoint.IndexTip, hand, out var index))
                     continue;
+
+                // 确认面板：检测 Yes/No
+                if (inConfirmMode)
+                {
+                    if (confirmYesButton != null &&
+                        Vector3.Distance(index.Position, confirmYesButton.transform.position) < touchDistance)
+                    {
+                        ConfirmYes();
+                        lastActionTime = Time.time;
+                        StartCoroutine(Flash(confirmYesButton));
+                        return;
+                    }
+                    if (confirmNoButton != null &&
+                        Vector3.Distance(index.Position, confirmNoButton.transform.position) < touchDistance)
+                    {
+                        ConfirmNo();
+                        lastActionTime = Time.time;
+                        StartCoroutine(Flash(confirmNoButton));
+                        return;
+                    }
+                    continue; // 确认模式下不检测其他按钮
+                }
 
                 if (!inDrawMode)
                 {
@@ -118,7 +178,17 @@ namespace MRReP.UI
         {
             if (Time.time - lastActionTime < 0.3f) return;
 
-            if (!inDrawMode)
+            // 确认面板：Editor 鼠标也能点 Yes/No
+            if (inConfirmMode)
+            {
+                if (confirmYesButton != null && confirmYesButton.GetComponent<Collider>().Raycast(ray, out RaycastHit h, 1f))
+                { ConfirmYes(); lastActionTime = Time.time; return; }
+                if (confirmNoButton != null && confirmNoButton.GetComponent<Collider>().Raycast(ray, out h, 1f))
+                { ConfirmNo(); lastActionTime = Time.time; return; }
+                return;
+            }
+
+            if (!inDrawMode && !inConfirmMode)
             {
                 for (int i = 0; i < buttons.Length; i++)
                 {
@@ -156,13 +226,11 @@ namespace MRReP.UI
                     Debug.Log("[Menu] Add → 画线模式");
                     ShowDrawPanel();
                     break;
-                case 1:
-                    controller.OnClearClicked();
-                    Debug.Log("[Menu] Clear");
+                case 1: // Clear → 确认面板
+                    ShowConfirmPanel("Clear path?", "Clear");
                     break;
-                case 2:
-                    controller.OnSendClicked();
-                    Debug.Log("[Menu] Send");
+                case 2: // Send → 确认面板
+                    ShowConfirmPanel("Send path?", "Send");
                     break;
                 case 3:
                     controller.OnBackClicked();
@@ -225,6 +293,37 @@ namespace MRReP.UI
 
             drawPanel.SetActive(false);
             Debug.Log("[SimpleHandMenu] 画线面板已生成");
+        }
+
+        private void CreateConfirmPanel()
+        {
+            confirmPanel = new GameObject("ConfirmPanel");
+            confirmPanel.transform.SetParent(transform, false);
+            confirmPanel.transform.localPosition = new Vector3(0, 0, menuOffsetZ);
+
+            // 问题文字
+            var qObj = new GameObject("ConfirmText");
+            qObj.transform.SetParent(confirmPanel.transform, false);
+            qObj.transform.localPosition = new Vector3(0, 0.01f, 0);
+            confirmText = qObj.AddComponent<TextMesh>();
+            confirmText.text = "Sure?";
+            confirmText.characterSize = 0.002f;
+            confirmText.fontSize = 48;
+            confirmText.anchor = TextAnchor.MiddleCenter;
+            confirmText.alignment = TextAlignment.Center;
+            confirmText.color = Color.cyan;
+
+            // Yes（绿）和 No（红）并排
+            confirmYesButton = CreateButton("Yes", Color.green,
+                confirmPanel.transform, new Vector3(-0.025f, -0.03f, 0));
+            confirmYesButton.transform.localScale = new Vector3(0.03f, 0.03f, 0.01f);
+
+            confirmNoButton = CreateButton("No", Color.red,
+                confirmPanel.transform, new Vector3(0.025f, -0.03f, 0));
+            confirmNoButton.transform.localScale = new Vector3(0.03f, 0.03f, 0.01f);
+
+            confirmPanel.SetActive(false);
+            Debug.Log("[SimpleHandMenu] 确认面板已生成");
         }
 
         private GameObject CreateButton(string label, Color color, Transform parent, Vector3 localPos)
