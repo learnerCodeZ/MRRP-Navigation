@@ -1173,7 +1173,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   trackedTargetType: 6
-  trackedHandedness: 3
+  trackedHandedness: 1
   trackedHandJoint: 2
   transformOverride: {fileID: 0}
   additionalOffset: {x: 0, y: 0, z: 0}
@@ -1224,7 +1224,6 @@ MonoBehaviour:
   spacing: 0.04
   buttonSize: {x: 0.04, y: 0.03, z: 0.01}
   menuOffsetZ: 0.15
-  clickDistance: 0.08
   touchDistance: 0.03
   controller: {fileID: 1951303357}
 --- !u!1 &690204327
@@ -1936,8 +1935,6 @@ MonoBehaviour:
   pathData: {fileID: 329333152}
   trackingInterval: 0.05
   pinchThreshold: 0.02
-  editorDrawPlaneY: 0.5
-  editorMinPointDistance: 0.05
 --- !u!1 &1059545462
 GameObject:
   m_ObjectHideFlags: 0

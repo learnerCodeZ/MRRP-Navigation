@@ -1,21 +1,20 @@
 using UnityEngine;
-using UnityEngine.EventSystems;
-using MRReP.ROS;
+using Microsoft.MixedReality.Toolkit;
 using Microsoft.MixedReality.Toolkit.Input;
 using Microsoft.MixedReality.Toolkit.Utilities;
 
 namespace MRReP.Path
 {
+    /// <summary>
+    /// 右手画线：用 MRTK 自带指针系统（白色射线+圈圈）。
+    /// 右手捏合 → 在指针圈圈位置（射线命中点）放一个路径点。
+    /// 连续：捏住拖动持续放点。MRTK 自带平滑 + 视觉反馈。
+    /// </summary>
     public class HandTracker : MonoBehaviour
     {
         [SerializeField] private PathData pathData;
         [SerializeField] private float trackingInterval = 0.05f;
         [SerializeField] private float pinchThreshold = 0.02f;
-#if UNITY_EDITOR
-        [SerializeField] private float editorDrawPlaneY = 0.5f;
-        [SerializeField] private float editorMinPointDistance = 0.05f;
-        private Vector3 _lastEditorPoint;
-#endif
 
         private bool _isTracking;
         private bool _waitingForRelease;
@@ -41,54 +40,54 @@ namespace MRReP.Path
             if (!_isTracking) return;
             if (Time.time - _lastSampleTime < trackingInterval) return;
 
-            // 手势捏合检测（Remoting + 设备都用），Editor 鼠标兜底
-            bool isPinching = CheckHoloLensPinch();
+            // 只检测右手捏合
+            bool isPinching = CheckRightHandPinch();
 #if UNITY_EDITOR
             if (!isPinching) isPinching = Input.GetMouseButton(0);
 #endif
 
             if (_waitingForRelease)
             {
-                if (!isPinching)
-                    _waitingForRelease = false;
+                if (!isPinching) _waitingForRelease = false;
                 return;
             }
 
             if (isPinching)
             {
-                AddHoloLensPinchPoint();
-                // 连续画线：捏住拖动持续加点（不设 _waitingForRelease）
+                AddPointAtPointer();
                 _lastSampleTime = Time.time;
             }
         }
 
-        private bool CheckHoloLensPinch()
+        /// <summary>右手捏合检测（拇指+食指尖距离 < 阈值）</summary>
+        private bool CheckRightHandPinch()
         {
-            // MRTK 2.8.3 标准：HandJointUtils.TryGetJointPose(关节, 左右手, out pose)
-            foreach (var hand in new[] { Handedness.Right, Handedness.Left })
+            if (HandJointUtils.TryGetJointPose(TrackedHandJoint.ThumbTip, Handedness.Right, out var thumb) &&
+                HandJointUtils.TryGetJointPose(TrackedHandJoint.IndexTip, Handedness.Right, out var index))
             {
-                if (HandJointUtils.TryGetJointPose(TrackedHandJoint.ThumbTip, hand, out var thumb) &&
-                    HandJointUtils.TryGetJointPose(TrackedHandJoint.IndexTip, hand, out var index))
-                {
-                    if (Vector3.Distance(thumb.Position, index.Position) < pinchThreshold)
-                        return true;
-                }
+                return Vector3.Distance(thumb.Position, index.Position) < pinchThreshold;
             }
             return false;
         }
 
-        private void AddHoloLensPinchPoint()
+        /// <summary>
+        /// 用 MRTK 自带指针系统获取右手射线命中点 → 路径点。
+        /// MRTK 的白色射线+圈圈就是指针视觉，捏合时圈圈缩小=选中反馈。
+        /// 不用自己画瞄准线。
+        /// </summary>
+        private void AddPointAtPointer()
         {
-            // 从手掌位置向下打地板（可靠），路径跟着手移动
-            // TODO: 激光笔模式（手掌朝向射线）需在 Editor 里 Debug 正确方向再开
-            foreach (var hand in new[] { Handedness.Right, Handedness.Left })
+            var focusProvider = CoreServices.InputSystem?.FocusProvider;
+            if (focusProvider == null) return;
+
+            foreach (var pointer in focusProvider.GetPointers<IMixedRealityPointer>())
             {
-                if (HandJointUtils.TryGetJointPose(TrackedHandJoint.Palm, hand, out var palm))
+                if (pointer.Controller == null) continue;
+                if (pointer.Controller.ControllerHandedness != Handedness.Right) continue;
+
+                if (focusProvider.TryGetFocusDetails(pointer, out var focus) && focus.Object != null)
                 {
-                    if (Physics.Raycast(palm.Position, Vector3.down, out var hit, 5f))
-                    {
-                        pathData.AddPoint(hit.point + Vector3.up * 0.03f);  // 抬高 3cm
-                    }
+                    pathData.AddPoint(focus.Point + Vector3.up * 0.03f);
                     return;
                 }
             }

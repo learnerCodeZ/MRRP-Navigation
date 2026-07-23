@@ -1,6 +1,7 @@
 using UnityEngine;
 using Microsoft.MixedReality.Toolkit.Input;
 using Microsoft.MixedReality.Toolkit.Utilities;
+using MRReP.Path;
 
 namespace MRReP.UI
 {
@@ -10,89 +11,104 @@ namespace MRReP.UI
         [SerializeField] private float spacing = 0.04f;
         [SerializeField] private Vector3 buttonSize = new Vector3(0.04f, 0.03f, 0.01f);
         [SerializeField] private float menuOffsetZ = 0.15f;
-        [SerializeField] private float clickDistance = 0.08f;
-        [SerializeField] private float touchDistance = 0.03f;  // 食指尖直接碰按钮的距离(3cm)
+        [SerializeField] private float touchDistance = 0.03f;
 
         [Header("功能引用")]
         [SerializeField] private PreferredPathMenuController controller;
 
+        // 主菜单
         private GameObject menuPanel;
         private GameObject[] buttons;
-        private bool wasPinching;
-        private float lastActionTime;
 
-        private void Start() { CreateMenu(); }
+        // 画线状态面板
+        private GameObject drawPanel;
+        private TextMesh pointCountText;
+        private GameObject drawBackButton;
+
+        private float lastActionTime;
+        private bool inDrawMode;
+        private PathData pathData;
+
+        private void Start()
+        {
+            pathData = FindObjectOfType<PathData>();
+            CreateMenu();
+            CreateDrawPanel();
+            ShowMenuPanel();
+        }
 
         private void Update()
         {
             if (controller == null) return;
 
-            // 直接触摸：食指尖碰到按钮就触发（不用 AirTap/捏合）
+            // 直接触摸检测
             if (Time.time - lastActionTime > 0.3f)
                 TryTouchButton();
 
-            #if UNITY_EDITOR
+            // 画线模式：实时更新点数显示
+            if (inDrawMode && pathData != null && pointCountText != null)
+                pointCountText.text = "Points: " + pathData.Count;
+
+#if UNITY_EDITOR
             if (Input.GetMouseButtonDown(0))
                 TrySelectByRay(Camera.main.ScreenPointToRay(Input.mousePosition));
-            #endif
+#endif
         }
 
-        // 直接触摸检测：食指尖(IndexTip)靠近按钮(< touchDistance)就触发
+        #region 面板切换
+
+        private void ShowMenuPanel()
+        {
+            if (menuPanel) menuPanel.SetActive(true);
+            if (drawPanel) drawPanel.SetActive(false);
+            inDrawMode = false;
+        }
+
+        private void ShowDrawPanel()
+        {
+            if (menuPanel) menuPanel.SetActive(false);
+            if (drawPanel) drawPanel.SetActive(true);
+            inDrawMode = true;
+        }
+
+        #endregion
+
+        #region 触摸检测
+
         private void TryTouchButton()
         {
-            foreach (var hand in new[] { Handedness.Right, Handedness.Left })
+            // 只右手点按钮（左手只负责显示面板，完全不参与交互）
+            foreach (var hand in new[] { Handedness.Right })
             {
-                if (HandJointUtils.TryGetJointPose(TrackedHandJoint.IndexTip, hand, out var index))
+                if (!HandJointUtils.TryGetJointPose(TrackedHandJoint.IndexTip, hand, out var index))
+                    continue;
+
+                if (!inDrawMode)
                 {
+                    // 主菜单：检测 4 个按钮
                     for (int i = 0; i < buttons.Length; i++)
                     {
-                        if (buttons[i] == null) continue;
+                        if (buttons[i] == null || !buttons[i].activeSelf) continue;
                         if (Vector3.Distance(index.Position, buttons[i].transform.position) < touchDistance)
                         {
-                            OnButtonClicked(i);
+                            OnMenuButtonClicked(i);
                             lastActionTime = Time.time;
                             StartCoroutine(Flash(buttons[i]));
                             return;
                         }
                     }
                 }
-            }
-        }
-
-        private bool CheckPinch()
-        {
-            foreach (var hand in new[] { Handedness.Right, Handedness.Left })
-            {
-                if (HandJointUtils.TryGetJointPose(TrackedHandJoint.ThumbTip, hand, out var t) &&
-                    HandJointUtils.TryGetJointPose(TrackedHandJoint.IndexTip, hand, out var i))
+                else
                 {
-                    float d = Vector3.Distance(t.Position, i.Position);
-                    if (d < 0.03f) return true;
-                }
-            }
-            return false;
-        }
-
-        private void TrySelectButton()
-        {
-            if (Time.time - lastActionTime < 0.3f) return;
-
-            foreach (var hand in new[] { Handedness.Right, Handedness.Left })
-            {
-                // 用掌心位置检测，比食指尖更稳定
-                if (HandJointUtils.TryGetJointPose(TrackedHandJoint.Palm, hand, out var palm))
-                {
-                    for (int i = 0; i < buttons.Length; i++)
+                    // 画线面板：检测 Back 按钮
+                    if (drawBackButton != null &&
+                        Vector3.Distance(index.Position, drawBackButton.transform.position) < touchDistance)
                     {
-                        if (buttons[i] == null) continue;
-                        float dist = Vector3.Distance(palm.Position, buttons[i].transform.position);
-                        if (dist < clickDistance)
-                        {
-                            OnButtonClicked(i);
-                            lastActionTime = Time.time;
-                            StartCoroutine(Flash(buttons[i]));
-                            return;
-                        }
+                        controller.OnBackClicked();
+                        ShowMenuPanel();
+                        lastActionTime = Time.time;
+                        StartCoroutine(Flash(drawBackButton));
+                        return;
                     }
                 }
             }
@@ -101,27 +117,57 @@ namespace MRReP.UI
         private void TrySelectByRay(Ray ray)
         {
             if (Time.time - lastActionTime < 0.3f) return;
-            for (int i = 0; i < buttons.Length; i++)
+
+            if (!inDrawMode)
             {
-                if (buttons[i] == null) continue;
-                if (buttons[i].GetComponent<Collider>().Raycast(ray, out RaycastHit hit, 1.0f))
+                for (int i = 0; i < buttons.Length; i++)
                 {
-                    OnButtonClicked(i);
+                    if (buttons[i] == null) continue;
+                    if (buttons[i].GetComponent<Collider>().Raycast(ray, out RaycastHit hit, 1.0f))
+                    {
+                        OnMenuButtonClicked(i);
+                        lastActionTime = Time.time;
+                        StartCoroutine(Flash(buttons[i]));
+                        return;
+                    }
+                }
+            }
+            else
+            {
+                if (drawBackButton != null &&
+                    drawBackButton.GetComponent<Collider>().Raycast(ray, out RaycastHit hit, 1.0f))
+                {
+                    controller.OnBackClicked();
+                    ShowMenuPanel();
                     lastActionTime = Time.time;
-                    StartCoroutine(Flash(buttons[i]));
-                    return;
+                    StartCoroutine(Flash(drawBackButton));
                 }
             }
         }
 
-        private void OnButtonClicked(int index)
+        #endregion
+
+        private void OnMenuButtonClicked(int index)
         {
             switch (index)
             {
-                case 0: controller.OnAddClicked(); Debug.Log("[Menu] Add"); break;
-                case 1: controller.OnClearClicked(); Debug.Log("[Menu] Clear"); break;
-                case 2: controller.OnSendClicked(); Debug.Log("[Menu] Send"); break;
-                case 3: controller.OnBackClicked(); Debug.Log("[Menu] Back"); break;
+                case 0: // Add → 进画线模式
+                    controller.OnAddClicked();
+                    Debug.Log("[Menu] Add → 画线模式");
+                    ShowDrawPanel();
+                    break;
+                case 1:
+                    controller.OnClearClicked();
+                    Debug.Log("[Menu] Clear");
+                    break;
+                case 2:
+                    controller.OnSendClicked();
+                    Debug.Log("[Menu] Send");
+                    break;
+                case 3:
+                    controller.OnBackClicked();
+                    Debug.Log("[Menu] Back");
+                    break;
             }
         }
 
@@ -135,6 +181,8 @@ namespace MRReP.UI
             if (r != null) r.material.color = orig;
         }
 
+        #region 创建 UI
+
         private void CreateMenu()
         {
             menuPanel = new GameObject("MenuPanel");
@@ -147,27 +195,62 @@ namespace MRReP.UI
 
             for (int i = 0; i < labels.Length; i++)
             {
-                var b = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                b.name = labels[i];
-                b.transform.SetParent(menuPanel.transform, false);
-                b.transform.localPosition = new Vector3(0, -i * spacing, 0);
-                b.transform.localScale = buttonSize;
-                b.GetComponent<Renderer>().material.color = colors[i];
-
-                var t = new GameObject("Text_" + labels[i]);
-                t.transform.SetParent(b.transform, false);
-                t.transform.localPosition = new Vector3(0, 0, -0.006f);
-                var tm = t.AddComponent<TextMesh>();
-                tm.text = labels[i];
-                tm.characterSize = 0.05f;
-                tm.fontSize = 120;
-                tm.anchor = TextAnchor.MiddleCenter;
-                tm.alignment = TextAlignment.Center;
-                tm.color = Color.white;
-
-                buttons[i] = b;
+                buttons[i] = CreateButton(labels[i], colors[i],
+                    menuPanel.transform, new Vector3(0, -i * spacing, 0));
             }
-            Debug.Log("[SimpleHandMenu] 菜单已生成");
+            Debug.Log("[SimpleHandMenu] 主菜单已生成");
         }
+
+        private void CreateDrawPanel()
+        {
+            drawPanel = new GameObject("DrawPanel");
+            drawPanel.transform.SetParent(transform, false);
+            drawPanel.transform.localPosition = new Vector3(0, 0, menuOffsetZ);
+
+            // 点数显示
+            var countObj = new GameObject("PointCount");
+            countObj.transform.SetParent(drawPanel.transform, false);
+            countObj.transform.localPosition = new Vector3(0, 0.01f, 0);
+            pointCountText = countObj.AddComponent<TextMesh>();
+            pointCountText.text = "Points: 0";
+            pointCountText.characterSize = 0.002f;   // 跟 Back 按钮文字一样小（Back 在 Cube 里被缩了）
+            pointCountText.fontSize = 48;
+            pointCountText.anchor = TextAnchor.MiddleCenter;
+            pointCountText.alignment = TextAlignment.Center;
+            pointCountText.color = Color.cyan;
+
+            // Back 按钮
+            drawBackButton = CreateButton("Back", Color.red,
+                drawPanel.transform, new Vector3(0, -0.04f, 0));
+
+            drawPanel.SetActive(false);
+            Debug.Log("[SimpleHandMenu] 画线面板已生成");
+        }
+
+        private GameObject CreateButton(string label, Color color, Transform parent, Vector3 localPos)
+        {
+            var b = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            b.name = label;
+            b.layer = 2; // IgnoreRaycast：画线射线不打到按钮上，只打地板
+            b.transform.SetParent(parent, false);
+            b.transform.localPosition = localPos;
+            b.transform.localScale = buttonSize;
+            b.GetComponent<Renderer>().material.color = color;
+
+            var t = new GameObject("Text_" + label);
+            t.transform.SetParent(b.transform, false);
+            t.transform.localPosition = new Vector3(0, 0, -0.006f);
+            var tm = t.AddComponent<TextMesh>();
+            tm.text = label;
+            tm.characterSize = 0.05f;
+            tm.fontSize = 120;
+            tm.anchor = TextAnchor.MiddleCenter;
+            tm.alignment = TextAlignment.Center;
+            tm.color = Color.white;
+
+            return b;
+        }
+
+        #endregion
     }
 }
