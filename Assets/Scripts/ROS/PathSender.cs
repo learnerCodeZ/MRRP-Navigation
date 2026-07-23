@@ -14,31 +14,63 @@ namespace MRReP.ROS
         // 方案A(测试用)：路径以"车当前位姿"为基准——画的形状盖到车位姿上
         //   起点=车，方向随车头。画"朝前"的形状 → 路径从车头方向延伸。
         //   关闭则退回绝对坐标(落 map 原点)。真机用 QR 对齐(Phase 10)时关掉此项。
-        [SerializeField] private bool carRelative = true;
+        [SerializeField] private bool carRelative = false;
+
+        [Header("坐标对齐偏移（carRelative=false 时生效）")]
+        [Tooltip("路径坐标 + 此偏移 = 正确的 map 坐标。每次 HL2 启动后需重新标定（HL2 原点会变）。")]
+        [SerializeField] private float mapOffsetX = 0f;
+        [SerializeField] private float mapOffsetY = 0f;
+        [Tooltip("旋转修正（度），路径整体旋转此角度。")]
+        [SerializeField] private float mapOffsetYawDeg = 0f;
 
         private ROSConnection _rosConnection;
 
         // 小车当前 map 位姿(来自 /amcl_pose)
         private bool _haveCarPose = false;
         private double _carX, _carY;
+        private double _carYaw = 0.0;
         private double _cosYaw = 1.0, _sinYaw = 0.0;
+
+        // QR 对齐变换（由 QRAlignment 脚本设置）
+        private bool _useQRAlignment = false;
+        private double _alignOffsetX = 0.0;
+        private double _alignOffsetY = 0.0;
+        private double _alignRotation = 0.0; // 弧度
+        private double _alignCosR = 1.0, _alignSinR = 0.0;
+
+        // 公开属性（QRAlignment 用）
+        public bool HaveCarPose => _haveCarPose;
+        public float CarMapX => (float)_carX;
+        public float CarMapY => (float)_carY;
+        public float CarMapYaw => (float)_carYaw;
 
         private void Start()
         {
             _rosConnection = ROSConnection.GetOrCreateInstance();
-            // nav_msgs/Path：机器人侧 hrp_follower_node 订阅的是 Path
             _rosConnection.RegisterPublisher<PathMsg>(topicName);
-            if (carRelative)
-                _rosConnection.Subscribe<PoseWithCovarianceStampedMsg>(carPoseTopic, OnCarPose);
+            // 始终订阅 amcl_pose（QR 对齐需要车位姿）
+            _rosConnection.Subscribe<PoseWithCovarianceStampedMsg>(carPoseTopic, OnCarPose);
+        }
+
+        /// <summary>由 QRAlignment 调用：设置 Unity↔map 对齐变换</summary>
+        public void SetAlignment(float offsetX, float offsetY, float rotationRad)
+        {
+            _useQRAlignment = true;
+            _alignOffsetX = offsetX;
+            _alignOffsetY = offsetY;
+            _alignRotation = rotationRad;
+            _alignCosR = System.Math.Cos(rotationRad);
+            _alignSinR = System.Math.Sin(rotationRad);
+            Debug.Log($"[PathSender] QR 对齐已设置: offset=({offsetX:F2},{offsetY:F2}), rot={rotationRad * 180.0 / System.Math.PI:F1}°");
         }
 
         private void OnCarPose(PoseWithCovarianceStampedMsg msg)
         {
             _carX = msg.pose.pose.position.x;
             _carY = msg.pose.pose.position.y;
-            double yaw = YawFromQuaternion(msg.pose.pose.orientation);
-            _cosYaw = System.Math.Cos(yaw);
-            _sinYaw = System.Math.Sin(yaw);
+            _carYaw = YawFromQuaternion(msg.pose.pose.orientation);
+            _cosYaw = System.Math.Cos(_carYaw);
+            _sinYaw = System.Math.Sin(_carYaw);
             _haveCarPose = true;
         }
 
@@ -70,8 +102,32 @@ namespace MRReP.ROS
                 }
                 else
                 {
-                    mx = rosPoints[i].x;  // fallback：绝对(落 map 原点)
-                    my = rosPoints[i].y;
+                    // 绝对坐标 + QR 对齐变换（优先）或手动偏移（兜底）
+                    double rx = rosPoints[i].x;
+                    double ry = rosPoints[i].y;
+
+                    if (_useQRAlignment)
+                    {
+                        // QR 对齐：先旋转再平移
+                        double tx = _alignCosR * rx - _alignSinR * ry;
+                        double ty = _alignSinR * rx + _alignCosR * ry;
+                        mx = tx + _alignOffsetX;
+                        my = ty + _alignOffsetY;
+                    }
+                    else
+                    {
+                        // 手动偏移兜底
+                        if (mapOffsetYawDeg != 0f)
+                        {
+                            double yaw = mapOffsetYawDeg * System.Math.PI / 180.0;
+                            double c = System.Math.Cos(yaw), s = System.Math.Sin(yaw);
+                            double t2x = c * rx - s * ry;
+                            double t2y = s * rx + c * ry;
+                            rx = t2x; ry = t2y;
+                        }
+                        mx = rx + mapOffsetX;
+                        my = ry + mapOffsetY;
+                    }
                 }
 
                 poses[i] = new PoseStampedMsg
@@ -90,7 +146,7 @@ namespace MRReP.ROS
             };
             _rosConnection.Publish(topicName, message);
 
-            Debug.Log($"[PathSender] Sent {poses.Length} points to {topicName} (frame={frameId}, carRelative={useCarRelative})");
+            Debug.Log($"[PathSender] Sent {poses.Length} points to {topicName} (frame={frameId}, carRelative={useCarRelative}, qrAligned={_useQRAlignment})");
         }
 
         private static double YawFromQuaternion(QuaternionMsg q)

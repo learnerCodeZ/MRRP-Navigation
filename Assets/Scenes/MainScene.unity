@@ -943,7 +943,7 @@ MonoBehaviour:
   topicName: /hrp_path
   frameId: map
   carPoseTopic: /amcl_pose
-  carRelative: 1
+  carRelative: 0
 --- !u!1 &616018788
 GameObject:
   m_ObjectHideFlags: 0
