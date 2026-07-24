@@ -25,11 +25,11 @@ namespace MRReP.UI
         [Tooltip("QR 中心相对 base_link 的位置（ROS 坐标系：x=前, y=左, z=上）")]
         [SerializeField] private float qrOffsetForward = -0.11f;
         [SerializeField] private float qrOffsetLeft = -0.08f;
-        [SerializeField] private float qrOffsetUp = 0.25f;
+        [SerializeField] private float qrOffsetUp = 0.275f;
 
         [Header("QR 朝向")]
-        [Tooltip("QR 法线相对车头方向的偏转角（度）。贴右侧朝外=-90, 贴左侧=90, 贴前面=0, 贴后面=180")]
-        [SerializeField] private float qrFacingYawDeg = -90f;
+        [Tooltip("QR 法线相对车头方向的偏转角（度）。贴顶部朝上=忽略(水平法线不影响yaw)，贴右侧朝外=-90, 贴前面=0")]
+        [SerializeField] private float qrFacingYawDeg = 0f;
 
         [Header("调试")]
         [SerializeField] private bool debugLog = true;
@@ -113,14 +113,28 @@ namespace MRReP.UI
             float offsetX = qrMapX - qrRosPos.x;
             float offsetY = qrMapY - qrRosPos.y;
 
-            // 4. 旋转偏移 = (车头朝向 + QR朝向偏移) - QR 法线朝向(ROS 轴)
-            //    QR 法线 = qrUnityRot * Vector3.forward，转 ROS 轴后算 yaw
-            //    qrFacingYawDeg 是 QR 法线相对车头的角度（右侧=-90, 左侧=90, 前方=0）
+            // 4. 旋转偏移
+            //    QR 法线 = qrUnityRot * Vector3.back，转 ROS 轴后算 yaw
             Vector3 qrForwardUnity = qrUnityRot * Vector3.back;
             Vector3 qrForwardRos = CoordinateConverter.UnityToROS(qrForwardUnity);
-            float qrAngleRos = Mathf.Atan2(qrForwardRos.y, qrForwardRos.x); // QR 法线在 ROS 轴的 yaw
             float qrFacingRad = qrFacingYawDeg * Mathf.Deg2Rad;
-            float rotationOffset = carYaw + qrFacingRad - qrAngleRos; // 旋转修正
+
+            // 检测 QR 法线是否接近垂直（朝上/朝下）→ atan2 不稳定，用车头朝向兜底
+            float horizMag = Mathf.Sqrt(qrForwardRos.x * qrForwardRos.x + qrForwardRos.y * qrForwardRos.y);
+            float rotationOffset;
+            if (horizMag < 0.3f)
+            {
+                // QR 朝上：法线垂直，水平分量太小，atan2 无意义
+                // 用车头朝向(carYaw) + 用户可调偏移(qrFacingYawDeg) 作为旋转
+                rotationOffset = carYaw + qrFacingRad;
+                Debug.Log("[QRAlignment] QR 朝上，旋转用车头朝向兜底（qrFacingYawDeg 可微调方向）");
+            }
+            else
+            {
+                // QR 侧面/前面：法线水平，正常计算
+                float qrAngleRos = Mathf.Atan2(qrForwardRos.y, qrForwardRos.x);
+                rotationOffset = carYaw + qrFacingRad - qrAngleRos;
+            }
 
             // 5. 存入 PathSender
             pathSender.SetAlignment(offsetX, offsetY, rotationOffset);
