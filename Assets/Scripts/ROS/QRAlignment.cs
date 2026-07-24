@@ -49,23 +49,32 @@ namespace MRReP.UI
         private void Update()
         {
             if (_aligned || !_scanning) return;
+
+            // 调试输出每秒一次的状态
+            _debugTimer += Time.deltaTime;
+            if (_debugTimer > 1f)
+            {
+                _debugTimer = 0f;
+                bool haveCar = pathSender != null && pathSender.HaveCarPose;
+                var mm = ARMarkerManager.Instance;
+                int markerCount = mm != null ? mm.trackables.count : -1;
+                Debug.Log($"[QRAlignment] 扫描中... carPose={haveCar}, markerMgr={mm != null}, markers={markerCount}");
+            }
+
             if (pathSender == null || !pathSender.HaveCarPose) return;
 
-            // 从 ARMarkerManager 查找 QR 码
             var markerManager = ARMarkerManager.Instance;
             if (markerManager == null) return;
 
             foreach (var marker in markerManager.trackables)
             {
                 if (marker == null) continue;
-                if (marker.markerType != ARMarkerType.QRCode) continue;
 
-                // 拿到 QR 在 Unity 的位姿
                 Vector3 qrUnityPos = marker.transform.position;
                 Quaternion qrUnityRot = marker.transform.rotation;
 
                 if (debugLog)
-                    Debug.Log($"[QRAlignment] QR 检测到！Unity 位姿: pos={qrUnityPos}, rot={qrUnityRot.eulerAngles}");
+                    Debug.Log($"[QRAlignment] QR 检测到！Unity 位姿: pos={qrUnityPos}, rot={qrUnityRot.eulerAngles}, type={marker.markerType}");
 
                 ComputeAlignment(qrUnityPos, qrUnityRot);
                 _aligned = true;
@@ -73,6 +82,8 @@ namespace MRReP.UI
                 return;
             }
         }
+
+        private float _debugTimer;
 
         /// <summary>
         /// 计算 Unity↔map 变换并存入 PathSender。
