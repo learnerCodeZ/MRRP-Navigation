@@ -23,18 +23,32 @@ namespace MRReP.UI
 
         [Header("QR 到 base_link 的偏移（用尺子量，固定值）")]
         [Tooltip("QR 中心相对 base_link 的位置（ROS 坐标系：x=前, y=左, z=上）")]
-        [SerializeField] private float qrOffsetForward = 0.0f;   // QR 在 base_link 前方多少米
-        [SerializeField] private float qrOffsetLeft = 0.0f;      // QR 在 base_link 左侧多少米
-        [SerializeField] private float qrOffsetUp = 0.15f;       // QR 在 base_link 上方多少米（车顶）
+        [SerializeField] private float qrOffsetForward = -0.11f;
+        [SerializeField] private float qrOffsetLeft = -0.08f;
+        [SerializeField] private float qrOffsetUp = 0.25f;
+
+        [Header("QR 朝向")]
+        [Tooltip("QR 法线相对车头方向的偏转角（度）。贴右侧朝外=-90, 贴左侧=90, 贴前面=0, 贴后面=180")]
+        [SerializeField] private float qrFacingYawDeg = -90f;
 
         [Header("调试")]
         [SerializeField] private bool debugLog = true;
 
         private bool _aligned = false;
+        private bool _scanning = false;
+
+        /// <summary>是否已对齐</summary>
+        public bool IsAligned => _aligned;
+
+        /// <summary>开始扫描（Calibrate 按钮调用）</summary>
+        public void StartScanning() { _scanning = true; }
+
+        /// <summary>停止扫描</summary>
+        public void StopScanning() { _scanning = false; }
 
         private void Update()
         {
-            if (_aligned) return;
+            if (_aligned || !_scanning) return;
             if (pathSender == null || !pathSender.HaveCarPose) return;
 
             // 从 ARMarkerManager 查找 QR 码
@@ -55,7 +69,8 @@ namespace MRReP.UI
 
                 ComputeAlignment(qrUnityPos, qrUnityRot);
                 _aligned = true;
-                return; // 对齐一次就够
+                _scanning = false;
+                return;
             }
         }
 
@@ -87,13 +102,14 @@ namespace MRReP.UI
             float offsetX = qrMapX - qrRosPos.x;
             float offsetY = qrMapY - qrRosPos.y;
 
-            // 4. 旋转偏移 = 车头朝向(map) - QR 法线朝向(ROS 轴)
-            //    QR 的"朝前"方向 = QR 平面法线 = qrUnityRot * Vector3.forward
-            //    转 ROS 轴后算 yaw
+            // 4. 旋转偏移 = (车头朝向 + QR朝向偏移) - QR 法线朝向(ROS 轴)
+            //    QR 法线 = qrUnityRot * Vector3.forward，转 ROS 轴后算 yaw
+            //    qrFacingYawDeg 是 QR 法线相对车头的角度（右侧=-90, 左侧=90, 前方=0）
             Vector3 qrForwardUnity = qrUnityRot * Vector3.forward;
             Vector3 qrForwardRos = CoordinateConverter.UnityToROS(qrForwardUnity);
             float qrAngleRos = Mathf.Atan2(qrForwardRos.y, qrForwardRos.x); // QR 法线在 ROS 轴的 yaw
-            float rotationOffset = carYaw - qrAngleRos; // 旋转修正
+            float qrFacingRad = qrFacingYawDeg * Mathf.Deg2Rad;
+            float rotationOffset = carYaw + qrFacingRad - qrAngleRos; // 旋转修正
 
             // 5. 存入 PathSender
             pathSender.SetAlignment(offsetX, offsetY, rotationOffset);
@@ -114,6 +130,7 @@ namespace MRReP.UI
         public void ResetAlignment()
         {
             _aligned = false;
+            _scanning = false;
             if (pathSender != null) pathSender.SetAlignment(0, 0, 0);
             Debug.Log("[QRAlignment] 已重置，重新扫 QR 即可对齐");
         }
