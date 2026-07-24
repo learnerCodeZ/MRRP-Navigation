@@ -116,7 +116,7 @@ namespace MRReP.UI
             // 4. 旋转偏移 = (车头朝向 + QR朝向偏移) - QR 法线朝向(ROS 轴)
             //    QR 法线 = qrUnityRot * Vector3.forward，转 ROS 轴后算 yaw
             //    qrFacingYawDeg 是 QR 法线相对车头的角度（右侧=-90, 左侧=90, 前方=0）
-            Vector3 qrForwardUnity = qrUnityRot * Vector3.forward;
+            Vector3 qrForwardUnity = qrUnityRot * Vector3.back;
             Vector3 qrForwardRos = CoordinateConverter.UnityToROS(qrForwardUnity);
             float qrAngleRos = Mathf.Atan2(qrForwardRos.y, qrForwardRos.x); // QR 法线在 ROS 轴的 yaw
             float qrFacingRad = qrFacingYawDeg * Mathf.Deg2Rad;
