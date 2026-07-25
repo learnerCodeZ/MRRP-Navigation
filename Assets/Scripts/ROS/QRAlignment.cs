@@ -114,26 +114,28 @@ namespace MRReP.UI
             float offsetY = qrMapY - qrRosPos.y;
 
             // 4. 旋转偏移
-            //    QR 法线 = qrUnityRot * Vector3.back，转 ROS 轴后算 yaw
-            Vector3 qrForwardUnity = qrUnityRot * Vector3.back;
-            Vector3 qrForwardRos = CoordinateConverter.UnityToROS(qrForwardUnity);
             float qrFacingRad = qrFacingYawDeg * Mathf.Deg2Rad;
-
-            // 检测 QR 法线是否接近垂直（朝上/朝下）→ atan2 不稳定，用车头朝向兜底
-            float horizMag = Mathf.Sqrt(qrForwardRos.x * qrForwardRos.x + qrForwardRos.y * qrForwardRos.y);
             float rotationOffset;
-            if (horizMag < 0.3f)
+
+            // 先试法线方向（Z轴/back）
+            Vector3 qrNormalUnity = qrUnityRot * Vector3.back;
+            Vector3 qrNormalRos = CoordinateConverter.UnityToROS(qrNormalUnity);
+            float normalHorizMag = Mathf.Sqrt(qrNormalRos.x * qrNormalRos.x + qrNormalRos.y * qrNormalRos.y);
+
+            if (normalHorizMag >= 0.3f)
             {
-                // QR 朝上：法线垂直，水平分量太小，atan2 无意义
-                // 用车头朝向(carYaw) + 用户可调偏移(qrFacingYawDeg) 作为旋转
-                rotationOffset = carYaw + qrFacingRad;
-                Debug.Log("[QRAlignment] QR 朝上，旋转用车头朝向兜底（qrFacingYawDeg 可微调方向）");
+                // QR 侧面/前面：法线水平，正常计算
+                float qrAngleRos = Mathf.Atan2(qrNormalRos.y, qrNormalRos.x);
+                rotationOffset = carYaw + qrFacingRad - qrAngleRos;
             }
             else
             {
-                // QR 侧面/前面：法线水平，正常计算
-                float qrAngleRos = Mathf.Atan2(qrForwardRos.y, qrForwardRos.x);
-                rotationOffset = carYaw + qrFacingRad - qrAngleRos;
+                // QR 朝上：法线垂直 → 用 QR 的 X 轴（right）算 yaw（X 轴水平，有方向信息）
+                Vector3 qrRightUnity = qrUnityRot * Vector3.right;
+                Vector3 qrRightRos = CoordinateConverter.UnityToROS(qrRightUnity);
+                float qrRightAngleRos = Mathf.Atan2(qrRightRos.y, qrRightRos.x);
+                rotationOffset = carYaw + qrFacingRad - qrRightAngleRos;
+                Debug.Log($"[QRAlignment] QR 朝上：用 X轴(right) 算旋转, qrRightAngle={qrRightAngleRos * Mathf.Rad2Deg:F1}°, qrFacing={qrFacingYawDeg}°");
             }
 
             // 5. 存入 PathSender
