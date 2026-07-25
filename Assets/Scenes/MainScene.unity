@@ -2974,6 +2974,7 @@ MonoBehaviour:
   topicName: /hololens/pose
   frameId: map
   publishInterval: 0.1
+  headOffsetDeg: 0
 --- !u!1 &1652635646
 GameObject:
   m_ObjectHideFlags: 0

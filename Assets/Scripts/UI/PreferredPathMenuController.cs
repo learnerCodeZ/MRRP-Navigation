@@ -32,6 +32,10 @@ namespace MRReP.UI
 
         private MenuState _currentState = MenuState.Off;
 
+        // 实时草稿轮询：边画边发 /hrp_draft（WebRop 实时镜像），clear/send 时清空
+        private float _draftTimer;
+        private int _lastDraftCount = -1;
+
         private void Start()
         {
             UpdateStatusText();
@@ -39,6 +43,20 @@ namespace MRReP.UI
 
         private void Update()
         {
+            // 实时草稿：点数变化时发 /hrp_draft（add 边画边发；clear 发空），10Hz 节流
+            _draftTimer += Time.deltaTime;
+            if (_draftTimer >= 0.1f)
+            {
+                _draftTimer = 0f;
+                int n = pathData != null ? pathData.Count : 0;
+                if (n != _lastDraftCount)
+                {
+                    _lastDraftCount = n;
+                    if (n > 0) pathSender.SendDraft(pathData);
+                    else pathSender.ClearDraft();
+                }
+            }
+
             // 键盘快捷键测试（Play 模式下使用）
             if (Input.GetKeyDown(KeyCode.A))
                 OnAddClicked();
@@ -56,6 +74,8 @@ namespace MRReP.UI
                 {
                     handTracker.StopTracking();
                     pathSender.SendPath(pathData);
+                    pathSender.ClearDraft(); // 路径已发，清掉 WebRop 上的草稿
+                    _lastDraftCount = pathData.Count; // pathData 还有 N 点，避免轮询立刻重发草稿
                     _currentState = MenuState.Send;
                     UpdateStatusText();
                 }
@@ -115,6 +135,8 @@ namespace MRReP.UI
                 localPathFollower.StartFollowing();
             else
                 pathSender.SendPath(pathData);
+            pathSender.ClearDraft(); // 路径已发，清掉 WebRop 上的草稿
+            _lastDraftCount = pathData.Count;
             _currentState = MenuState.Send;
             UpdateStatusText();
         }
@@ -133,6 +155,8 @@ namespace MRReP.UI
             {
                 pathSender.SendPath(pathData);
             }
+            pathSender.ClearDraft();
+            _lastDraftCount = pathData.Count;
 
             _currentState = MenuState.Send;
             UpdateStatusText();

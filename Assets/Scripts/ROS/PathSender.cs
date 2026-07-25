@@ -38,10 +38,11 @@ namespace MRReP.ROS
         private double _alignRotation = 0.0; // 弧度
         private double _alignCosR = 1.0, _alignSinR = 0.0;
 
-        // WebRop 校准偏移（由 /hololens/alignment 设置）
+        // WebRop 校准偏移（由 /hololens/alignment 设置）：P_true = Rot(theta)·P_raw + (x,y)
         private bool _useWebAlign = false;
         private double _webOffsetX = 0.0;
         private double _webOffsetY = 0.0;
+        private double _webRot = 0.0;
 
         // 公开属性（QRAlignment 用）
         public bool HaveCarPose => _haveCarPose;
@@ -49,23 +50,27 @@ namespace MRReP.ROS
         public float CarMapY => (float)_carY;
         public float CarMapYaw => (float)_carYaw;
 
+        [SerializeField] private string draftTopic = "/hrp_draft"; // 实时草稿（只给 WebRop 看，不触发车）
+
         private void Start()
         {
             _rosConnection = ROSConnection.GetOrCreateInstance();
             _rosConnection.RegisterPublisher<PathMsg>(topicName);
+            _rosConnection.RegisterPublisher<PathMsg>(draftTopic);
             // 始终订阅 amcl_pose（QR 对齐需要车位姿）
             _rosConnection.Subscribe<PoseWithCovarianceStampedMsg>(carPoseTopic, OnCarPose);
             // 订阅 WebRop 校准偏移
             _rosConnection.Subscribe<RosMessageTypes.Geometry.Pose2DMsg>("/hololens/alignment", OnWebAlign);
         }
 
-        /// <summary>WebRop 校准偏移回调（/hololens/alignment）</summary>
+        /// <summary>WebRop 校准偏移回调（/hololens/alignment）：x/y=平移 T_origin，theta=旋转 Δ</summary>
         private void OnWebAlign(RosMessageTypes.Geometry.Pose2DMsg msg)
         {
             _useWebAlign = true;
             _webOffsetX = msg.x;
             _webOffsetY = msg.y;
-            Debug.Log($"[PathSender] WebRop 校准偏移: ({msg.x:F2}, {msg.y:F2})");
+            _webRot = msg.theta;
+            Debug.Log($"[PathSender] WebRop 校准: T=({msg.x:F2},{msg.y:F2}) θ={msg.theta * 180.0 / System.Math.PI:F1}°");
         }
 
         /// <summary>由 QRAlignment 调用：设置 Unity↔map 对齐变换</summary>
@@ -92,11 +97,48 @@ namespace MRReP.ROS
 
         public void SendPath(Path.PathData pathData)
         {
-            if (pathData == null || pathData.Count == 0)
+            var poses = BuildPoses(pathData);
+            if (poses.Length == 0)
             {
                 Debug.LogWarning("[PathSender] No path points to send.");
                 return;
             }
+            var message = new PathMsg
+            {
+                header = new HeaderMsg { frame_id = frameId },
+                poses = poses
+            };
+            _rosConnection.Publish(topicName, message);
+            Debug.Log($"[PathSender] Sent {poses.Length} points to {topicName} (carRelative={carRelative && _haveCarPose}, qrAligned={_useQRAlignment}, webAligned={_useWebAlign})");
+        }
+
+        /// <summary>实时草稿：把当前路径（同样套校准）发到 /hrp_draft，供 WebRop 实时叠显。不触发车。</summary>
+        public void SendDraft(Path.PathData pathData)
+        {
+            var poses = BuildPoses(pathData); // 空路径返回长度 0
+            var message = new PathMsg
+            {
+                header = new HeaderMsg { frame_id = frameId },
+                poses = poses
+            };
+            _rosConnection.Send(draftTopic, message);
+        }
+
+        /// <summary>清空草稿：发空 Path 到 /hrp_draft，WebRop 收到即清屏。</summary>
+        public void ClearDraft()
+        {
+            var message = new PathMsg
+            {
+                header = new HeaderMsg { frame_id = frameId },
+                poses = new PoseStampedMsg[0]
+            };
+            _rosConnection.Send(draftTopic, message);
+        }
+
+        /// <summary>把手绘点(Unity)经校准(carRelative/QR/WebRop/手动)转成 map 帧 PoseStamped[]。</summary>
+        private PoseStampedMsg[] BuildPoses(Path.PathData pathData)
+        {
+            if (pathData == null || pathData.Count == 0) return new PoseStampedMsg[0];
 
             // 原始手绘点(Unity) → ROS 轴向
             var rosPoints = CoordinateConverter.ConvertPathToROS(pathData.Points);
@@ -118,13 +160,12 @@ namespace MRReP.ROS
                 }
                 else
                 {
-                    // 绝对坐标 + QR 对齐变换（优先）或手动偏移（兜底）
+                    // 绝对坐标 + QR 对齐变换（优先）或 WebRop 校准或手动偏移（兜底）
                     double rx = rosPoints[i].x;
                     double ry = rosPoints[i].y;
 
                     if (_useQRAlignment)
                     {
-                        // QR 对齐：先旋转再平移
                         double tx = _alignCosR * rx - _alignSinR * ry;
                         double ty = _alignSinR * rx + _alignCosR * ry;
                         mx = tx + _alignOffsetX;
@@ -132,13 +173,14 @@ namespace MRReP.ROS
                     }
                     else if (_useWebAlign)
                     {
-                        // WebRop 校准偏移（纯平移，无旋转）
-                        mx = rx + _webOffsetX;
-                        my = ry + _webOffsetY;
+                        // WebRop 校准：先旋转 Δ 再平移 T_origin（P_true = Rot(Δ)·P_raw + T）
+                        double cosR = System.Math.Cos(_webRot);
+                        double sinR = System.Math.Sin(_webRot);
+                        mx = cosR * rx - sinR * ry + _webOffsetX;
+                        my = sinR * rx + cosR * ry + _webOffsetY;
                     }
                     else
                     {
-                        // 手动偏移兜底
                         if (mapOffsetYawDeg != 0f)
                         {
                             double yaw = mapOffsetYawDeg * System.Math.PI / 180.0;
@@ -160,15 +202,7 @@ namespace MRReP.ROS
                         new QuaternionMsg(0, 0, 0, 1))
                 };
             }
-
-            var message = new PathMsg
-            {
-                header = new HeaderMsg { frame_id = frameId },
-                poses = poses
-            };
-            _rosConnection.Publish(topicName, message);
-
-            Debug.Log($"[PathSender] Sent {poses.Length} points to {topicName} (frame={frameId}, carRelative={useCarRelative}, qrAligned={_useQRAlignment}, webAligned={_useWebAlign})");
+            return poses;
         }
 
         private static double YawFromQuaternion(QuaternionMsg q)
