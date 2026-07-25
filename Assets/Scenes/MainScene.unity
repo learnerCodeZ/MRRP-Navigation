@@ -2912,6 +2912,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1567894580}
   - component: {fileID: 1567894581}
+  - component: {fileID: 1567894582}
   m_Layer: 0
   m_Name: Managers
   m_TagString: Untagged
@@ -2955,9 +2956,24 @@ MonoBehaviour:
   pathSender: {fileID: 606713789}
   qrOffsetForward: -0.11
   qrOffsetLeft: -0.08
-  qrOffsetUp: 0.25
-  qrFacingYawDeg: -90
+  qrOffsetUp: 0.275
+  qrFacingYawDeg: 0
   debugLog: 1
+--- !u!114 &1567894582
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1567894579}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2d01e22db8e24354ea60bba1ce9e2484, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  topicName: /hololens/pose
+  frameId: map
+  publishInterval: 0.1
 --- !u!1 &1652635646
 GameObject:
   m_ObjectHideFlags: 0

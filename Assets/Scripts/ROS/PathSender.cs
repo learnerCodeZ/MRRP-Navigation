@@ -38,6 +38,11 @@ namespace MRReP.ROS
         private double _alignRotation = 0.0; // 弧度
         private double _alignCosR = 1.0, _alignSinR = 0.0;
 
+        // WebRop 校准偏移（由 /hololens/alignment 设置）
+        private bool _useWebAlign = false;
+        private double _webOffsetX = 0.0;
+        private double _webOffsetY = 0.0;
+
         // 公开属性（QRAlignment 用）
         public bool HaveCarPose => _haveCarPose;
         public float CarMapX => (float)_carX;
@@ -50,6 +55,17 @@ namespace MRReP.ROS
             _rosConnection.RegisterPublisher<PathMsg>(topicName);
             // 始终订阅 amcl_pose（QR 对齐需要车位姿）
             _rosConnection.Subscribe<PoseWithCovarianceStampedMsg>(carPoseTopic, OnCarPose);
+            // 订阅 WebRop 校准偏移
+            _rosConnection.Subscribe<RosMessageTypes.Geometry.Pose2DMsg>("/hololens/alignment", OnWebAlign);
+        }
+
+        /// <summary>WebRop 校准偏移回调（/hololens/alignment）</summary>
+        private void OnWebAlign(RosMessageTypes.Geometry.Pose2DMsg msg)
+        {
+            _useWebAlign = true;
+            _webOffsetX = msg.x;
+            _webOffsetY = msg.y;
+            Debug.Log($"[PathSender] WebRop 校准偏移: ({msg.x:F2}, {msg.y:F2})");
         }
 
         /// <summary>由 QRAlignment 调用：设置 Unity↔map 对齐变换</summary>
@@ -114,6 +130,12 @@ namespace MRReP.ROS
                         mx = tx + _alignOffsetX;
                         my = ty + _alignOffsetY;
                     }
+                    else if (_useWebAlign)
+                    {
+                        // WebRop 校准偏移（纯平移，无旋转）
+                        mx = rx + _webOffsetX;
+                        my = ry + _webOffsetY;
+                    }
                     else
                     {
                         // 手动偏移兜底
@@ -146,7 +168,7 @@ namespace MRReP.ROS
             };
             _rosConnection.Publish(topicName, message);
 
-            Debug.Log($"[PathSender] Sent {poses.Length} points to {topicName} (frame={frameId}, carRelative={useCarRelative}, qrAligned={_useQRAlignment})");
+            Debug.Log($"[PathSender] Sent {poses.Length} points to {topicName} (frame={frameId}, carRelative={useCarRelative}, qrAligned={_useQRAlignment}, webAligned={_useWebAlign})");
         }
 
         private static double YawFromQuaternion(QuaternionMsg q)

@@ -142,10 +142,7 @@ PlayerSettings:
   visionOSBundleVersion: 1.0
   tvOSBundleVersion: 1.0
   bundleVersion: 1.0
-  preloadedAssets:
-  - {fileID: -451049810094877513, guid: 11dd52197e0110543b8716b04a478e40, type: 2}
-  - {fileID: 11400000, guid: 553559b9f075e95438482ec23e04e429, type: 2}
-  - {fileID: 1993213190559214053, guid: daf11e50eb5e37f4fa5aef59219eacf2, type: 2}
+  preloadedAssets: []
   metroInputSource: 0
   wsaTransparentSwapchain: 0
   m_HolographicPauseOnTrackingLoss: 1
@@ -615,7 +612,7 @@ PlayerSettings:
   metroTileBackgroundColor: {r: 0.13333334, g: 0.17254902, b: 0.21568628, a: 0}
   metroSplashScreenBackgroundColor: {r: 0.12941177, g: 0.17254902, b: 0.21568628, a: 1}
   metroSplashScreenUseBackgroundColor: 0
-  syncCapabilities: 0
+  syncCapabilities: 1
   platformCapabilities:
     WindowsStoreApps:
       PrivateNetworkClientServer: True
