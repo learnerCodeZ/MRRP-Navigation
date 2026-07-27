@@ -35,6 +35,7 @@ namespace MRReP.UI
         // 实时草稿轮询：边画边发 /hrp_draft（WebRop 实时镜像），clear/send 时清空
         private float _draftTimer;
         private int _lastDraftCount = -1;
+        private int _diagCounter; // 周期诊断（每 0.5s 打一次，确认 Update 在跑 + Count 在涨）
 
         private void Start()
         {
@@ -49,11 +50,14 @@ namespace MRReP.UI
             {
                 _draftTimer = 0f;
                 int n = pathData != null ? pathData.Count : 0;
+                _diagCounter++;
+                if (_diagCounter % 5 == 0) // 每 0.5s 一次
+                    Debug.Log($"[Controller] diag Count={n} lastDraft={_lastDraftCount} pathData={(pathData != null ? "OK" : "NULL")}");
                 if (n != _lastDraftCount)
                 {
                     _lastDraftCount = n;
-                    if (n > 0) pathSender.SendDraft(pathData);
-                    else pathSender.ClearDraft();
+                    if (n > 0) { pathSender.SendDraft(pathData); Debug.Log("[Controller] draft 发送 n=" + n); }
+                    else { pathSender.ClearDraft(); Debug.Log("[Controller] draft 清空"); }
                 }
             }
 
@@ -88,6 +92,7 @@ namespace MRReP.UI
                     localPathFollower.StopFollowing();
                 pathRenderer.ClearRenderers();
                 pathData.Clear();
+                if (pathSender != null) { pathSender.ClearAll(); _lastDraftCount = 0; }
                 _currentState = MenuState.Off;
                 UpdateStatusText();
             }
@@ -108,6 +113,7 @@ namespace MRReP.UI
                 localPathFollower.StopFollowing();
             pathRenderer.ClearRenderers();
             pathData.Clear();
+            if (pathSender != null) { pathSender.ClearAll(); _lastDraftCount = 0; } // 同步清 WebRop 上的 /hrp_path + /hrp_draft
             _currentState = MenuState.Off;
             UpdateStatusText();
         }
@@ -121,6 +127,7 @@ namespace MRReP.UI
                 localPathFollower.StopFollowing();
             pathRenderer.ClearRenderers();
             pathData.Clear();
+            if (pathSender != null) { pathSender.ClearAll(); _lastDraftCount = 0; } // 同步清 WebRop 上的 /hrp_path + /hrp_draft
             _currentState = MenuState.Off;
             UpdateStatusText();
         }

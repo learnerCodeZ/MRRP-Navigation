@@ -57,6 +57,7 @@ namespace MRReP.ROS
             _rosConnection = ROSConnection.GetOrCreateInstance();
             _rosConnection.RegisterPublisher<PathMsg>(topicName);
             _rosConnection.RegisterPublisher<PathMsg>(draftTopic);
+            Debug.Log("[PathSender] 已注册发布器: " + topicName + " + " + draftTopic);
             // 始终订阅 amcl_pose（QR 对齐需要车位姿）
             _rosConnection.Subscribe<PoseWithCovarianceStampedMsg>(carPoseTopic, OnCarPose);
             // 订阅 WebRop 校准偏移
@@ -133,6 +134,24 @@ namespace MRReP.ROS
                 poses = new PoseStampedMsg[0]
             };
             _rosConnection.Send(draftTopic, message);
+        }
+
+        /// <summary>清空已发路径：发空 Path 到 /hrp_path，WebRop 收到即清掉红线。</summary>
+        public void ClearPath()
+        {
+            var message = new PathMsg
+            {
+                header = new HeaderMsg { frame_id = frameId },
+                poses = new PoseStampedMsg[0]
+            };
+            _rosConnection.Send(topicName, message);
+        }
+
+        /// <summary>清掉 WebRop 上所有 HL2 路径显示（/hrp_path + /hrp_draft 都发空）。HL2 Clear 时调。</summary>
+        public void ClearAll()
+        {
+            ClearPath();
+            ClearDraft();
         }
 
         /// <summary>把手绘点(Unity)经校准(carRelative/QR/WebRop/手动)转成 map 帧 PoseStamped[]。</summary>
