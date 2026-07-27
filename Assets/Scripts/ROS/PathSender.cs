@@ -86,6 +86,37 @@ namespace MRReP.ROS
             Debug.Log($"[PathSender] QR 对齐已设置: offset=({offsetX:F2},{offsetY:F2}), rot={rotationRad * 180.0 / System.Math.PI:F1}°");
         }
 
+        /// <summary>
+        /// 把 map 坐标点转成 Unity 世界坐标（用当前生效对齐 QR/web/手动 的【逆】变换）。
+        /// 供 CarBeacon 等需要把 map 位姿摆到 HL2 真实位置的脚本用。
+        /// BuildPoses 正向：map = Rot(rot)·ros + offset；此处求逆 ros = Rot(-rot)·(map - offset)。
+        /// 返回 false = 当前无任何对齐（调用方应退化为未校准放置）。
+        /// </summary>
+        public bool MapPointToUnity(double mapX, double mapY, out Vector3 unityPos)
+        {
+            double ox, oy, rot;
+            if (_useQRAlignment) { ox = _alignOffsetX; oy = _alignOffsetY; rot = _alignRotation; }
+            else if (_useWebAlign) { ox = _webOffsetX; oy = _webOffsetY; rot = _webRot; }
+            else if (mapOffsetX != 0f || mapOffsetY != 0f || mapOffsetYawDeg != 0f)
+            {
+                ox = mapOffsetX; oy = mapOffsetY; rot = mapOffsetYawDeg * System.Math.PI / 180.0;
+            }
+            else
+            {
+                // 无对齐：退化为纯轴变换（不叠加未校准的 Anchor）
+                unityPos = CoordinateConverter.ROSToUnity(new Vector3((float)mapX, (float)mapY, 0f));
+                return false;
+            }
+
+            double dx = mapX - ox, dy = mapY - oy;
+            double cosR = System.Math.Cos(rot), sinR = System.Math.Sin(rot);
+            // Rot(-rot)：rx = cos·dx + sin·dy ；ry = -sin·dx + cos·dy
+            double rx = cosR * dx + sinR * dy;
+            double ry = -sinR * dx + cosR * dy;
+            unityPos = CoordinateConverter.ROSToUnity(new Vector3((float)rx, (float)ry, 0f));
+            return true;
+        }
+
         private void OnCarPose(PoseWithCovarianceStampedMsg msg)
         {
             _carX = msg.pose.pose.position.x;
