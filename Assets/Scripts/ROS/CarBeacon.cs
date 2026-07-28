@@ -42,10 +42,13 @@ namespace MRReP.ROS
         private void OnCarPose(PoseWithCovarianceStampedMsg msg)
         {
             var p = msg.pose.pose.position;
-            Vector3 unityPos;
+            Vector3 unityPos = Vector3.zero;
+            bool aligned = false;
 
             // ★优先用对齐（QR 扫码 / WebRop 两点）：map→Unity 逆变换，准确贴车
-            bool aligned = pathSender != null && pathSender.MapPointToUnity(p.x, p.y, out unityPos);
+            //   拆开写，避免 && + out 触发 CS0165「可能未赋值」
+            if (pathSender != null)
+                aligned = pathSender.MapPointToUnity(p.x, p.y, out unityPos);
             if (!aligned)
             {
                 // 退化：无对齐时纯轴变换 + 未校准 Anchor（粗略，仅保证能看到信标）
