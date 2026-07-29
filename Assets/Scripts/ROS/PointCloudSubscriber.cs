@@ -60,8 +60,8 @@ namespace MRReP.ROS
         {
             if (msg.data == null || msg.data.Length == 0) return;
 
-            // 找 x/y/z 在每个点里的字节偏移（PointCloud2 标准）
-            int ox = 0, oy = 4, oz = 8;
+            // 找 x/y/z 在每个点里的字节偏移（PointCloud2 标准），rgb 偏移（H5 上色，-1=无色）
+            int ox = 0, oy = 4, oz = 8, orb = -1;
             if (msg.fields != null)
             {
                 for (int i = 0; i < msg.fields.Length; i++)
@@ -70,6 +70,7 @@ namespace MRReP.ROS
                     if (f.name == "x") ox = (int)f.offset;
                     else if (f.name == "y") oy = (int)f.offset;
                     else if (f.name == "z") oz = (int)f.offset;
+                    else if (f.name == "rgb") orb = (int)f.offset;
                 }
             }
             int pointStep = msg.point_step > 0 ? (int)msg.point_step : 12;
@@ -97,9 +98,14 @@ namespace MRReP.ROS
                 else
                     u = CoordinateConverter.ROSToUnity(new Vector3(x, y, z));
 
+                // H5 上色：有 rgb 字段就取该点真实颜色，否则用默认粉色
+                Color c = pointColor;
+                if (orb >= 0 && b + orb + 3 <= data.Length)
+                    c = new Color(data[b + orb] / 255f, data[b + orb + 1] / 255f, data[b + orb + 2] / 255f, pointColor.a);
+
                 _particles[count].position = u;
                 _particles[count].startSize = pointSize;
-                _particles[count].startColor = pointColor;
+                _particles[count].startColor = c;
                 _particles[count].remainingLifetime = 999999f;
                 count++;
             }
